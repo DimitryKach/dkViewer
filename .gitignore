@@ -1,0 +1,19 @@
+# CMake build files
+/build/
+CMakeCache.txt
+CMakeFiles/
+*.cmake.user
+
+# Visual Studio generated
+*.sln
+*.vcxproj*
+*.user
+*.ipch/
+*.opensdf
+*.sdf
+*.ilk
+*.log
+*.obj
+*.exe
+*.pdb
+*.ide.*

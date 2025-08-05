@@ -1,0 +1,44 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 19,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vs2022-debug",
+      "displayName": "🛠️  Debug (Visual Studio 17 2022, x64)",
+      "description": "Configure dkViewer in Debug mode for VS2022 x64",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/vs2022-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "vs2022-release",
+      "displayName": "🚀 Release (Visual Studio 17 2022, x64)",
+      "description": "Configure dkViewer in Release mode for VS2022 x64",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/vs2022-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vs2022-debug",
+      "configurePreset": "vs2022-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-release",
+      "configurePreset": "vs2022-release",
+      "configuration": "Release"
+    }
+  ]
+}

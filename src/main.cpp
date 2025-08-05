@@ -1,0 +1,355 @@
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+// Dear ImGui core
+#include "imgui.h"
+// ImGui backends
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_opengl3.h"
+// STD libs
+#include <iostream>
+#include <algorithm>
+#include <vector>
+#include <string>
+#include <filesystem>
+// Local
+#include "utils.h"
+#include "Shader.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#include "Scene.h"
+
+//#define GLM_ENABLE_EXPERIMENTAL
+//#include <glm/glm.hpp>
+//#include <glm/gtc/matrix_transform.hpp>
+//#include <glm/gtx/io.hpp>
+
+#include <Eigen/Geometry>
+#include "Camera.h"
+
+static const std::string g_assets_folder = ASSETS_DIR;
+
+void framebuffer_size_clbk(GLFWwindow* window, int width, int height);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+
+struct MeshData {
+    float* vertices;
+};
+
+struct TextureData {
+    unsigned char* data;
+    int width;
+    int height;
+    int nChannels;
+};
+
+Camera camera;
+
+Eigen::Matrix4f setupProjectionMtx(float fov, float aspect_ratio, float near, float far)
+{
+    float tanHalfFOV = tanf(ToRadian(fov / 2.0f));
+    float d = 1.0f / tanHalfFOV;
+    float A = (-far - near) / (far - near);
+    float B = -(2 * far * near) / (far - near);
+
+    Eigen::Matrix4f pm;
+    pm <<
+        d / aspect_ratio, 0.0f, 0.0f, 0.0f,
+        0.0f, d, 0.0f, 0.0f,
+        0.0f, 0.0f, A, B,
+        0.0f, 0.0f, -1.0f, 0.0f;
+
+    return pm;
+}
+
+std::vector<unsigned int> textureSetup(const std::vector<std::string> &texture_paths)
+{
+    stbi_set_flip_vertically_on_load(true);
+    std::vector<unsigned int> textureIDs;
+
+    std::vector<TextureData> texData;
+    for (int i = 0; i < texture_paths.size(); i++)
+    {
+        TextureData texture;
+        texture.data = stbi_load(texture_paths[i].c_str(), &texture.width, &texture.height, &texture.nChannels, 0);
+        if (texture.data)
+        {
+            std::cout << "Image " << texture_paths[i] << " loaded succesfully" << std::endl;
+            texData.push_back(texture);
+            textureIDs.push_back(i);
+        }
+        else
+        {
+            std::cout << "Image " << texture_paths[i] << " failed to load" << std::endl;
+        }
+    }
+
+    for (int texID = 0; texID < texData.size(); texID++)
+    {
+        unsigned int _texID = texID;
+        glGenTextures(1, &_texID);
+        // Bind this texture to modify it
+        glBindTexture(GL_TEXTURE_2D, texID);
+        if (texData[texID].nChannels == 3)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texData[texID].width, texData[texID].height, 0, GL_RGB, GL_UNSIGNED_BYTE, texData[texID].data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        else if(texData[texID].nChannels == 4)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texData[texID].width, texData[texID].height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData[texID].data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+    }
+    for (unsigned int texID = 0; texID < texData.size(); texID++)
+    {
+        stbi_image_free(texData[texID].data);
+    }
+    return textureIDs;
+}
+
+Scene* MyScene = NULL;
+
+int main()
+{
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    
+    MyScene = new Scene();
+
+    GLFWwindow* window = glfwCreateWindow(MyScene->SCR_WIDTH, MyScene->SCR_HEIGHT, MyScene->title, NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create the GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    glfwMakeContextCurrent(window);
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;   // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;       // Enable Docking
+    // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;  // Enable Multi-Viewport
+
+    // 5. Setup ImGui style
+    ImGui::StyleColorsDark();
+    // If viewports are enabled, tweak style:
+    // ImGuiStyle& style = ImGui::GetStyle();
+    // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    //     style.WindowRounding = 0.0f;
+    //     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    // }
+
+    // 6. Initialize ImGui GLFW + OpenGL3 backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_clbk);
+
+    //glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetKeyCallback(window, [](GLFWwindow* w, int key, int scancode, int action, int mods) {
+        ImGui_ImplGlfw_KeyCallback(w, key, scancode, action, mods);
+        key_callback(w, key, scancode, action, mods);
+    });
+
+    glfwSetCursorPosCallback(window, [](GLFWwindow* w, double x, double y) {
+        ImGui_ImplGlfw_CursorPosCallback(w, x, y);
+        mouse_callback(w, x, y);
+    });
+
+    glfwSetMouseButtonCallback(window, [](GLFWwindow* w, int button, int action, int mods) {
+        ImGui_ImplGlfw_MouseButtonCallback(w, button, action, mods);
+        mouse_button_callback(w, button, action, mods);
+    });
+
+    glfwSetScrollCallback(window, [](GLFWwindow* w, double xoffset, double yoffset) {
+        ImGui_ImplGlfw_ScrollCallback(w, xoffset, yoffset);
+        scroll_callback(w, xoffset, yoffset);
+    });
+
+    //Shader shader("VertexShader.vert", "FragPosBased.frag");
+    auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
+    auto fragShaderPath = std::filesystem::path(g_assets_folder) / "Frag_BasicLighting.frag";
+    Shader shader(vertShaderPath.string().c_str(), fragShaderPath.string().c_str());
+
+    //////////////////// MESH SETUP /////////////////////////
+    //unsigned int VBO, VAO, EBO;
+    //geometrySetup(VBO, VAO, EBO);
+    //MyScene->LoadModel("D:/Personal/git/LearnOpenGL/assets/spider.obj");
+    MyScene->LoadModel("D:/Personal/git/old_dk_viewer/buddha.obj");
+
+    ////////////////// TEXTURE SETUP ///////////////////////
+    std::vector<std::string> texturePaths = {
+        "C:/Users/dimit/Downloads/container.jpg",
+        "C:/Users/dimit/Downloads/awesomeface.png"
+    };
+    std::vector<unsigned int> textureIDs = textureSetup(texturePaths);
+
+    shader.use();
+    for (int texID = 0; texID < textureIDs.size(); texID++)
+    {
+        shader.setInt(("texture" + std::to_string(texID+1)), texID);
+    }
+
+    ////////////////// CAMERA SETUP //////////////////////
+
+    // this is the render loop, that is also the frame processing
+
+    //glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+    glFrontFace(GL_CW);
+    glCullFace(GL_BACK);
+    float last_rot = 0.0f;
+
+    while (!glfwWindowShouldClose(window))
+    {
+        glfwPollEvents();
+
+        // Start ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // 9. Your own simple window
+        {
+            static float f = 0.0f;
+            static int counter = 0;
+            ImGui::Begin("Hello, ImGui!");
+            ImGui::Text("This is a basic ImGui window.");
+            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+            if (ImGui::Button("Button")) counter++;
+            ImGui::SameLine();
+            ImGui::Text("Counter = %d", counter);
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::End();
+        }
+
+        // Rendering
+        ImGui::Render();
+        // compute transforms
+        float time = (float)glfwGetTime();
+        Eigen::Matrix4f viewMtx = camera.getMtx();
+        Eigen::Matrix4f modelMtx = Eigen::Matrix4f::Identity();
+        modelMtx.topLeftCorner<3, 3>() *= 0.1f;
+        
+        //modelMtx.block<3, 3>(0, 0) = Eigen::AngleAxisf(time, Eigen::Vector3f::UnitY()).matrix();
+
+        // now we do the rendering
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // draw
+        /*for (int texID = 0; texID < textureIDs.size(); texID++)
+        {
+            glActiveTexture(GL_TEXTURE0 + texID);
+            glBindTexture(GL_TEXTURE_2D, texID);
+        }*/
+        shader.use();
+        //shader.setFloat("mixValue", MyScene->MIX_VALUE);
+        Eigen::Matrix4f final = MyScene->projectionMtx * viewMtx * modelMtx;
+
+        // Bind view and projection matrices
+        shader.setMat4("model", modelMtx.data());
+        shader.setMat4("view", viewMtx.data());
+        shader.setMat4("projection", MyScene->projectionMtx.data());
+        // Bind the light color and pos
+        Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+        shader.setVec3("lightColor", lightColor.data());
+        Eigen::Vector3f lightPos = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
+        lightPos = viewMtx.topLeftCorner<3,3>().inverse() * camera.position;
+        shader.setVec3("lightPos", lightPos.data());
+        //shader.setMat4("transform", final.data());
+        MyScene->models[0]->Render();
+
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); 
+
+        // update buffer
+        glfwSwapBuffers(window);
+    }
+
+    //glDeleteVertexArrays(1, &VAO);
+    //glDeleteBuffers(1, &VBO);
+    //glDeleteBuffers(1, &EBO);
+    /*for (int texID = 0; texID < textureIDs.size(); texID++)
+    {
+        unsigned int _texID = texID;
+        glDeleteTextures(1, &_texID);
+    }*/
+    shader.del();
+    
+    glfwTerminate();
+    return 0;
+}
+
+void framebuffer_size_clbk(GLFWwindow* window, int width, int height)
+{
+    glViewport(0, 0, width, height);
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+    if (key == GLFW_KEY_P && action == GLFW_PRESS)
+        MyScene->TIME_STATE_MULT = 1.0f;
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        MyScene->TIME_STATE_MULT = 0.0f;
+    if (key == GLFW_KEY_LEFT_BRACKET && action == GLFW_PRESS)
+    {
+        MyScene->FOV = std::max(0.0f, MyScene->FOV - 2.0f);
+        MyScene->projectionMtx = MyScene->CalcProjectionMtx();
+    }
+    if (key == GLFW_KEY_RIGHT_BRACKET && action == GLFW_PRESS)
+    {
+        MyScene->FOV += 2.0f;
+        MyScene->projectionMtx = MyScene->CalcProjectionMtx();
+    }
+    camera.handleKeyInputs(key);
+}
+
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) || ImGui::IsAnyItemActive()) {
+        // Mouse is over *some* ImGui window (including popups, tooltips, docks)
+        return;
+    }
+    if (camera.active)
+    {
+        camera.handleMouseMotion(xpos, ypos);
+    }
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    bool state = camera.active;
+    camera.handleMouseButtonInputs(button, action);
+    if (state != camera.active) // This suggests the states switched, so we need to store the current mouse position
+    {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        camera.lastX = (float)xpos;
+        camera.lastY = (float)ypos;
+    }
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    camera.handleMouseScroll(yoffset);
+}

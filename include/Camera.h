@@ -1,0 +1,58 @@
+#pragma once
+#include "utils.h"
+#include <Eigen/Dense>
+#include <GLFW/glfw3.h>
+
+class Camera
+{
+public:
+	float moveSpeed;
+	float yaw;
+	float pitch;
+	float roll;
+	float zoom;
+	float lastX;
+	float lastY;
+	Eigen::Vector3f position;
+	Eigen::Vector3f centerOfInterest;
+	Eigen::Vector3f target;
+	Eigen::Vector3f up;
+	bool doRotate;
+	bool doPan;
+	bool active;
+
+	void setupProjectionMtx();
+	Eigen::Matrix4f getMtx();
+	void zoomFwd(const float delta);
+	void moveFwd(const float delta);
+	void zoomBwd(const float delta);
+	void moveBwd(const float delta);
+	void moveLeft(const float delta);
+	void moveRight(const float delta);
+	void moveUp(const float delta);
+	void moveDown(const float delta);
+	void resetCOI();
+	void rotate(float inYaw, float inPitch, float inRoll);
+	void handleKeyInputs(int key);
+	void handleMouseButtonInputs(int button, int action);
+	void handleMouseMotion(double inX, double inY);
+	void handleMouseScroll(double amount);
+	void rotateTarget();
+
+	Camera()
+	{
+		position = Eigen::Vector3f(0.0f, 0.0f, 2.0f);
+		target = position;
+		centerOfInterest = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
+		up = Eigen::Vector3f::UnitY();
+		moveSpeed = 0.05f;
+		yaw = 0;
+		pitch = 0;
+		roll = 0;
+		doRotate = false;
+		doPan = false;
+		active = false;
+	}
+	~Camera() = default;
+};
+
