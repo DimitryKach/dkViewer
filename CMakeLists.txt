@@ -70,7 +70,6 @@ if(NOT imgui_POPULATED)
   )
   target_link_libraries(imgui PUBLIC
     glfw
-    glad
   )
   target_compile_definitions(imgui PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD)
   target_compile_definitions(imgui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
@@ -123,12 +122,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/include" PREFIX "Header Files" FI
 set(ASSETS_DIR "${CMAKE_BINARY_DIR}/assets")
 target_compile_definitions(dkViewer PRIVATE ASSETS_DIR="${ASSETS_DIR}")
 
-# Include directories for our code
-include_directories(${glad_SOURCE_DIR}/include)
-
 target_include_directories(dkViewer PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${glad_SOURCE_DIR}/include
 )
 
 # Link libraries
