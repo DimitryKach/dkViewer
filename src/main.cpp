@@ -8,24 +8,22 @@
 #include "backends/imgui_impl_opengl3.h"
 // STD libs
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 #include <vector>
+#include <memory>
 #include <string>
 #include <filesystem>
+// Eigen
+#include <Eigen/Geometry>
 // Local
 #include "utils.h"
 #include "Shader.h"
-#define STB_IMAGE_IMPLEMENTATION
+#include "TextureManager.h"
 #include "stb_image.h"
 #include "Scene.h"
-
-//#define GLM_ENABLE_EXPERIMENTAL
-//#include <glm/glm.hpp>
-//#include <glm/gtc/matrix_transform.hpp>
-//#include <glm/gtx/io.hpp>
-
-#include <Eigen/Geometry>
 #include "Camera.h"
+#include "Mesh.h"
 
 static const std::string g_assets_folder = ASSETS_DIR;
 
@@ -35,83 +33,44 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
-struct MeshData {
-    float* vertices;
-};
-
-struct TextureData {
-    unsigned char* data;
-    int width;
-    int height;
-    int nChannels;
-};
-
-Camera camera;
-
-Eigen::Matrix4f setupProjectionMtx(float fov, float aspect_ratio, float near, float far)
-{
-    float tanHalfFOV = tanf(ToRadian(fov / 2.0f));
-    float d = 1.0f / tanHalfFOV;
-    float A = (-far - near) / (far - near);
-    float B = -(2 * far * near) / (far - near);
-
-    Eigen::Matrix4f pm;
-    pm <<
-        d / aspect_ratio, 0.0f, 0.0f, 0.0f,
-        0.0f, d, 0.0f, 0.0f,
-        0.0f, 0.0f, A, B,
-        0.0f, 0.0f, -1.0f, 0.0f;
-
-    return pm;
-}
-
-std::vector<unsigned int> textureSetup(const std::vector<std::string> &texture_paths)
-{
-    stbi_set_flip_vertically_on_load(true);
-    std::vector<unsigned int> textureIDs;
-
-    std::vector<TextureData> texData;
-    for (int i = 0; i < texture_paths.size(); i++)
-    {
-        TextureData texture;
-        texture.data = stbi_load(texture_paths[i].c_str(), &texture.width, &texture.height, &texture.nChannels, 0);
-        if (texture.data)
-        {
-            std::cout << "Image " << texture_paths[i] << " loaded succesfully" << std::endl;
-            texData.push_back(texture);
-            textureIDs.push_back(i);
-        }
-        else
-        {
-            std::cout << "Image " << texture_paths[i] << " failed to load" << std::endl;
-        }
-    }
-
-    for (int texID = 0; texID < texData.size(); texID++)
-    {
-        unsigned int _texID = texID;
-        glGenTextures(1, &_texID);
-        // Bind this texture to modify it
-        glBindTexture(GL_TEXTURE_2D, texID);
-        if (texData[texID].nChannels == 3)
-        {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texData[texID].width, texData[texID].height, 0, GL_RGB, GL_UNSIGNED_BYTE, texData[texID].data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        }
-        else if(texData[texID].nChannels == 4)
-        {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texData[texID].width, texData[texID].height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texData[texID].data);
-            glGenerateMipmap(GL_TEXTURE_2D);
-        }
-    }
-    for (unsigned int texID = 0; texID < texData.size(); texID++)
-    {
-        stbi_image_free(texData[texID].data);
-    }
-    return textureIDs;
-}
-
 Scene* MyScene = NULL;
+TextureManager* TexManager = NULL;
+
+void setupScene(Scene* scene)
+{
+    //////////////////// MESH SETUP /////////////////////////
+    auto modelPath = std::filesystem::path(g_assets_folder) / "spider.obj";
+    auto Mesh = MyScene->LoadModel(modelPath.string().c_str());
+
+    ////////////////// SHADER SETUP  ///////////////////////
+    auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
+    auto fragShaderPath = std::filesystem::path(g_assets_folder) / "Frag_BasicLighting.frag";
+
+    auto shader = MyScene->CreateShader(
+        vertShaderPath.string().c_str(),
+        fragShaderPath.string().c_str()
+        );
+
+    if (Mesh)
+    {
+        Mesh->SetShader(shader);
+    }
+
+    ////////////////// TEXTURE SETUP ///////////////////////
+    TexManager = new TextureManager();
+    std::vector<std::string> texturePaths = {
+        "C:/Users/dimit/Downloads/container.jpg",
+        "C:/Users/dimit/Downloads/awesomeface.png"
+    };
+    for (auto& texPath : texturePaths)
+    {
+        unsigned int id;
+        if (TexManager->loadTexture(texPath, id))
+        {
+            shader->addTexture(id);
+        }
+    }
+}
 
 int main()
 {
@@ -122,7 +81,7 @@ int main()
 
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     
-    MyScene = new Scene();
+    MyScene = new Scene(); // This creates a default camera
 
     GLFWwindow* window = glfwCreateWindow(MyScene->SCR_WIDTH, MyScene->SCR_HEIGHT, MyScene->title, NULL, NULL);
     if (window == NULL)
@@ -182,32 +141,8 @@ int main()
         ImGui_ImplGlfw_ScrollCallback(w, xoffset, yoffset);
         scroll_callback(w, xoffset, yoffset);
     });
-
-    //Shader shader("VertexShader.vert", "FragPosBased.frag");
-    auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
-    auto fragShaderPath = std::filesystem::path(g_assets_folder) / "Frag_BasicLighting.frag";
-    Shader shader(vertShaderPath.string().c_str(), fragShaderPath.string().c_str());
-
-    //////////////////// MESH SETUP /////////////////////////
-    //unsigned int VBO, VAO, EBO;
-    //geometrySetup(VBO, VAO, EBO);
-    //MyScene->LoadModel("D:/Personal/git/LearnOpenGL/assets/spider.obj");
-    MyScene->LoadModel("D:/Personal/git/old_dk_viewer/buddha.obj");
-
-    ////////////////// TEXTURE SETUP ///////////////////////
-    std::vector<std::string> texturePaths = {
-        "C:/Users/dimit/Downloads/container.jpg",
-        "C:/Users/dimit/Downloads/awesomeface.png"
-    };
-    std::vector<unsigned int> textureIDs = textureSetup(texturePaths);
-
-    shader.use();
-    for (int texID = 0; texID < textureIDs.size(); texID++)
-    {
-        shader.setInt(("texture" + std::to_string(texID+1)), texID);
-    }
-
-    ////////////////// CAMERA SETUP //////////////////////
+    //////////////////  SCENE SETUP //////////////////////
+    setupScene(MyScene);
 
     // this is the render loop, that is also the frame processing
 
@@ -231,13 +166,24 @@ int main()
             static float f = 0.0f;
             static int counter = 0;
             ImGui::Begin("Hello, ImGui!");
-            ImGui::Text("This is a basic ImGui window.");
+            // Near plane slider
+            if (ImGui::SliderFloat("Near Plane", &MyScene->camera->NEAR, 0.01f, MyScene->camera->FAR - 0.1f, "%.3f")) {
+                MyScene->camera->updateProjMtx();
+            }
+            // Far plane slider
+            if (ImGui::SliderFloat("Far Plane", &MyScene->camera->FAR,MyScene->camera->NEAR + 0.1f, 1000.0f, "%.3f")) {
+                MyScene->camera->updateProjMtx();
+            }
+            if (ImGui::SliderFloat("FOV", &MyScene->camera->FOV, 0.1f, 180.0f, "%.3f")) {
+                MyScene->camera->updateProjMtx();
+            }
+            /*ImGui::Text("This is a basic ImGui window.");
             ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
             if (ImGui::Button("Button")) counter++;
             ImGui::SameLine();
             ImGui::Text("Counter = %d", counter);
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);*/
             ImGui::End();
         }
 
@@ -245,7 +191,7 @@ int main()
         ImGui::Render();
         // compute transforms
         float time = (float)glfwGetTime();
-        Eigen::Matrix4f viewMtx = camera.getMtx();
+        Eigen::Matrix4f viewMtx = MyScene->camera->getMtx();
         Eigen::Matrix4f modelMtx = Eigen::Matrix4f::Identity();
         modelMtx.topLeftCorner<3, 3>() *= 0.1f;
         
@@ -261,22 +207,25 @@ int main()
             glActiveTexture(GL_TEXTURE0 + texID);
             glBindTexture(GL_TEXTURE_2D, texID);
         }*/
-        shader.use();
-        //shader.setFloat("mixValue", MyScene->MIX_VALUE);
-        Eigen::Matrix4f final = MyScene->projectionMtx * viewMtx * modelMtx;
+        for (auto& mesh : MyScene->models)
+        {
+            auto shader = mesh->GetShader();
+            shader->use();
+            Eigen::Matrix4f final = MyScene->camera->projectionMtx * viewMtx * modelMtx;
 
-        // Bind view and projection matrices
-        shader.setMat4("model", modelMtx.data());
-        shader.setMat4("view", viewMtx.data());
-        shader.setMat4("projection", MyScene->projectionMtx.data());
-        // Bind the light color and pos
-        Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
-        shader.setVec3("lightColor", lightColor.data());
-        Eigen::Vector3f lightPos = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
-        lightPos = viewMtx.topLeftCorner<3,3>().inverse() * camera.position;
-        shader.setVec3("lightPos", lightPos.data());
-        //shader.setMat4("transform", final.data());
-        MyScene->models[0]->Render();
+            // Bind view and projection matrices
+            shader->setMat4("model", modelMtx.data());
+            shader->setMat4("view", viewMtx.data());
+            shader->setMat4("projection", MyScene->camera->projectionMtx.data());
+            // Bind the light color and pos
+            Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+            shader->setVec3("lightColor", lightColor.data());
+            Eigen::Vector3f lightPos = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
+            lightPos = viewMtx.topLeftCorner<3, 3>().inverse() * MyScene->camera->position;
+            shader->setVec3("lightPos", lightPos.data());
+            //shader.setMat4("transform", final.data());
+            mesh->Render();
+        }
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); 
 
@@ -292,7 +241,6 @@ int main()
         unsigned int _texID = texID;
         glDeleteTextures(1, &_texID);
     }*/
-    shader.del();
     
     glfwTerminate();
     return 0;
@@ -313,15 +261,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         MyScene->TIME_STATE_MULT = 0.0f;
     if (key == GLFW_KEY_LEFT_BRACKET && action == GLFW_PRESS)
     {
-        MyScene->FOV = std::max(0.0f, MyScene->FOV - 2.0f);
-        MyScene->projectionMtx = MyScene->CalcProjectionMtx();
+        MyScene->camera->FOV = std::max(0.0f, MyScene->camera->FOV - 2.0f);
+        MyScene->camera->updateProjMtx();
     }
     if (key == GLFW_KEY_RIGHT_BRACKET && action == GLFW_PRESS)
     {
-        MyScene->FOV += 2.0f;
-        MyScene->projectionMtx = MyScene->CalcProjectionMtx();
+        MyScene->camera->FOV += std::min(180.0f, MyScene->camera->FOV + 2.0f);
+        MyScene->camera->updateProjMtx();
     }
-    camera.handleKeyInputs(key);
+    MyScene->camera->handleKeyInputs(key);
 }
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
@@ -330,26 +278,25 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
         // Mouse is over *some* ImGui window (including popups, tooltips, docks)
         return;
     }
-    if (camera.active)
+    if (MyScene->camera->active)
     {
-        camera.handleMouseMotion(xpos, ypos);
+        MyScene->camera->handleMouseMotion(xpos, ypos);
     }
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
-    bool state = camera.active;
-    camera.handleMouseButtonInputs(button, action);
-    if (state != camera.active) // This suggests the states switched, so we need to store the current mouse position
+    bool state = MyScene->camera->active;
+    MyScene->camera->handleMouseButtonInputs(button, action);
+    if (state != MyScene->camera->active) // This suggests the states switched, so we need to store the current mouse position
     {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
-        camera.lastX = (float)xpos;
-        camera.lastY = (float)ypos;
+        MyScene->camera->updateLastPos((float)xpos, (float)ypos);
     }
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    camera.handleMouseScroll(yoffset);
+    MyScene->camera->handleMouseScroll(yoffset);
 }

@@ -1,37 +1,47 @@
+#include "utils.h"
 #include "Scene.h"
+#include "Mesh.h"
 #include "Camera.h"
+#include "Shader.h"
 
-Scene::Scene() : SCR_WIDTH(1000), SCR_HEIGHT(600), title("LearnOpenGL") {
-    MIX_VALUE = 0.2f;
-    FOV = 90.0f;
-    ASPECT_RATIO = (float)SCR_WIDTH / (float)SCR_HEIGHT;
-    NEAR = 0.5f;
-    FAR = 10.0f;
-    TIME_STATE_MULT = 1.0;
-    projectionMtx = CalcProjectionMtx();
+Scene::Scene() : SCR_WIDTH(1000), SCR_HEIGHT(600), TIME_STATE_MULT(1.0f), title("LearnOpenGL")
+{
+    camera = std::make_shared<Camera>();
+    camera->FOV = 90.0f;
+    camera->ASPECT_RATIO = (float)SCR_WIDTH / (float)SCR_HEIGHT;
+    camera->NEAR = 0.5f;
+    camera->FAR = 10.0f;
+    camera->updateProjMtx();
 }
 
-bool Scene::LoadModel(const std::string& file_path)
+Scene::~Scene()
 {
-    std::shared_ptr<BaseMesh> newMesh = std::make_shared<BaseMesh>();
-    models.emplace_back(newMesh);
-    newMesh->LoadFile(file_path);
-    return false;
+    for (auto& shader : shaders)
+    {
+        shader->del();
+    }
 }
 
-Eigen::Matrix4f Scene::CalcProjectionMtx()
+std::shared_ptr<Mesh> Scene::LoadModel(const std::string& file_path)
 {
-    float tanHalfFOV = tanf(ToRadian(FOV / 2.0f));
-    float d = 1.0f / tanHalfFOV;
-    float A = (-FAR - NEAR) / (FAR - NEAR);
-    float B = -(2 * FAR * NEAR) / (FAR - NEAR);
+    std::shared_ptr<Mesh> newMesh = std::make_shared<Mesh>();
+    if (!newMesh->LoadFile(file_path))
+    {
+        return nullptr;
+    };
+    models.push_back(newMesh);
+    return newMesh;
+}
 
-    Eigen::Matrix4f pm;
-    pm <<
-        d / ASPECT_RATIO, 0.0f, 0.0f, 0.0f,
-        0.0f, d, 0.0f, 0.0f,
-        0.0f, 0.0f, A, B,
-        0.0f, 0.0f, -1.0f, 0.0f;
+std::shared_ptr<Shader> Scene::CreateShader(const char* vertexShaderPath, const char* fragShaderPath)
+{
+    std::shared_ptr<Shader> shader = std::make_shared<Shader>(vertexShaderPath, fragShaderPath);
+    shaders.push_back(shader);
+    return shader;
+}
 
-    return pm;
+void Scene::AddTextureToShader(unsigned int id, std::shared_ptr<Shader> shader)
+{
+    if (!shader) return;
+    shader->addTexture(id);
 }

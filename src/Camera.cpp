@@ -183,3 +183,31 @@ void Camera::rotateTarget()
     target = _target;
     up = _up;
 }
+
+void Camera::updateLastPos(const float& xpos, const float& ypos)
+{
+    lastX = xpos;
+    lastY = ypos;
+}
+
+void Camera::updateProjMtx()
+{
+    projectionMtx = CalcProjectionMtx();
+}
+
+Eigen::Matrix4f Camera::CalcProjectionMtx()
+{
+    float tanHalfFOV = tanf(ToRadian(FOV / 2.0f));
+    float d = 1.0f / tanHalfFOV;
+    float A = (-FAR - NEAR) / (FAR - NEAR);
+    float B = -(2 * FAR * NEAR) / (FAR - NEAR);
+
+    Eigen::Matrix4f pm;
+    pm <<
+        d / ASPECT_RATIO, 0.0f, 0.0f, 0.0f,
+        0.0f, d, 0.0f, 0.0f,
+        0.0f, 0.0f, A, B,
+        0.0f, 0.0f, -1.0f, 0.0f;
+
+    return pm;
+}

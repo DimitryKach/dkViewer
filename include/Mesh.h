@@ -8,12 +8,13 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+class Shader;
 
-class BaseMesh
+class Mesh
 {
 public:
-	BaseMesh() {};
-	~BaseMesh();
+	Mesh() {};
+	~Mesh();
 
 	void Clear();
 	bool LoadFile(const std::string& file_path);
@@ -22,6 +23,9 @@ public:
 	void ReserveSpace(unsigned int NumVertices, unsigned int NumIndices);
 	void InitAllMeshes(const aiScene* pScene);
 	void InitSingleMesh(const aiMesh* paiMesh);
+	void SetShader(const std::shared_ptr <Shader> shader);
+	std::shared_ptr <Shader> GetShader();
+	void Cleanup();
 	void PopulateBuffers();
 	void Render();
 	void Draw();
@@ -61,7 +65,7 @@ private:
 	std::vector<Vertex> vertices;
 	std::vector<BasicMeshEntry> m_Meshes;
 	//std::vector<Texture*> m_Textures;
-
+	std::shared_ptr<Shader> m_shader;
 	std::vector<Eigen::Vector3f> m_Positions;
 	std::vector<Eigen::Vector3f> m_Normals;
 	std::vector<Eigen::Vector2f> m_TexCoords;

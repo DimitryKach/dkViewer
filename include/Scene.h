@@ -1,31 +1,25 @@
-#include "utils.h"
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-#include <iostream>
-#include <algorithm>
+#pragma once
 #include <vector>
 #include <string>
-#include "Mesh.h"
+#include <Eigen/Geometry>
+class Mesh;
 class Camera;
+class Shader;
 class Scene
 {
 public:
     Scene();
-    ~Scene() = default;
+    ~Scene();
 
     std::shared_ptr<Camera> camera;
-    std::vector<std::shared_ptr<BaseMesh>> models;
-    bool LoadModel(const std::string& file_path);
-    void SetupGeometry(unsigned int& VBO, unsigned int& VAO, unsigned int& EBO);
-    Eigen::Matrix4f CalcProjectionMtx();
+    std::vector<std::shared_ptr<Mesh>> models;
+    std::vector<std::shared_ptr<Shader>> shaders;
+    std::shared_ptr<Mesh> LoadModel(const std::string& file_path);
+    std::shared_ptr<Shader> CreateShader(const char* vertexShaderPath, const char* fragShaderPath);
+    void AddTextureToShader(unsigned int id, std::shared_ptr<Shader> shader);
     const unsigned int SCR_WIDTH;
     const unsigned int SCR_HEIGHT;
     const char* title;
     float MIX_VALUE;
-    float FOV;
-    float ASPECT_RATIO;
-    float NEAR;
-    float FAR;
     float TIME_STATE_MULT;
-    Eigen::Matrix4f projectionMtx;
 };

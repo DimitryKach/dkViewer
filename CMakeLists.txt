@@ -99,12 +99,12 @@ find_package(OpenGL REQUIRED)
 # ----------------------------------------------------------------------------
 # 10) Executable target
 # ----------------------------------------------------------------------------
-add_executable(dkViewer
-  src/main.cpp
-  src/Scene.cpp
-  src/Mesh.cpp
-  src/Camera.cpp
+# Collect all .cpp/.cxx sources automatically
+file(GLOB_RECURSE DKVIEWER_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cxx"
 )
+add_executable(dkViewer ${DKVIEWER_SOURCES})
 
 # ------------------------------------------------------------------------
 # 10.a) Treat include/ headers as part of the project
@@ -124,8 +124,11 @@ set(ASSETS_DIR "${CMAKE_BINARY_DIR}/assets")
 target_compile_definitions(dkViewer PRIVATE ASSETS_DIR="${ASSETS_DIR}")
 
 # Include directories for our code
+include_directories(${glad_SOURCE_DIR}/include)
+
 target_include_directories(dkViewer PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${glad_SOURCE_DIR}/include
 )
 
 # Link libraries
@@ -139,11 +142,24 @@ target_link_libraries(dkViewer PRIVATE
 )
 
 # ----------------------------------------------------------------------------
-# 11) Copy assets
+# 11) Include assets in the VS project and copy at build
 # ----------------------------------------------------------------------------
-add_custom_target(copy_assets ALL
+# Gather all asset files so they appear under "Assets" in Solution Explorer
+file(GLOB_RECURSE DKVIEWER_ASSETS
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/*"
+)
+# Exclude .obj files (to avoid treating them as object files during linking)
+list(FILTER DKVIEWER_ASSETS EXCLUDE REGEX "\.obj$")
+# Add assets to the dkViewer target so they show up in the IDE (they are not compiled)
+if(DKVIEWER_ASSETS)
+  target_sources(dkViewer PRIVATE ${DKVIEWER_ASSETS})
+  # Group assets under a virtual folder
+  source_group("Assets" FILES ${DKVIEWER_ASSETS})
+endif()
+
+# Copy assets to the build dir at build time
+add_custom_command(TARGET dkViewer PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_SOURCE_DIR}/assets
           ${CMAKE_BINARY_DIR}/assets
 )
-add_dependencies(dkViewer copy_assets)

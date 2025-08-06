@@ -1,4 +1,5 @@
 #include "Mesh.h"
+#include "Shader.h"
 
 #define SAFE_DELETE(p) if (p) { delete p; p = NULL; }
 #define ARRAY_SIZE_IN_ELEMENTS(a) (sizeof(m_Buffers)/sizeof(m_Buffers[0]))
@@ -8,13 +9,23 @@
 #define TEX_COORD_LOCATION 1
 #define NORMAL_LOCATION    2
 
-BaseMesh::~BaseMesh()
+Mesh::~Mesh()
 {
     Clear();
 }
 
+void Mesh::SetShader(const std::shared_ptr <Shader> shader)
+{
+    m_shader = shader;
+}
 
-void BaseMesh::Clear()
+std::shared_ptr <Shader> Mesh::GetShader()
+{
+    return m_shader;
+}
+
+
+void Mesh::Clear()
 {
     /*for (unsigned int i = 0; i < m_Textures.size(); i++) {
         SAFE_DELETE(m_Textures[i]);
@@ -30,14 +41,14 @@ void BaseMesh::Clear()
     }
 }
 
-void BaseMesh::Draw()
+void Mesh::Draw()
 {
     glBindVertexArray(m_VAO);
     //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
-bool BaseMesh::LoadFile(const std::string& Filename)
+bool Mesh::LoadFile(const std::string& Filename)
 {
     // Release the previously loaded mesh (if it exists)
     Clear();
@@ -67,7 +78,7 @@ bool BaseMesh::LoadFile(const std::string& Filename)
     return Ret;
 }
 
-bool BaseMesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
+bool Mesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
 {
     m_Meshes.resize(pScene->mNumMeshes);
     //m_Textures.resize(pScene->mNumMaterials);
@@ -87,7 +98,7 @@ bool BaseMesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
 }
 
 
-void BaseMesh::CountVerticesAndIndices(const aiScene* pScene, unsigned int& NumVertices, unsigned int& NumIndices)
+void Mesh::CountVerticesAndIndices(const aiScene* pScene, unsigned int& NumVertices, unsigned int& NumIndices)
 {
     for (unsigned int i = 0; i < m_Meshes.size(); i++) {
         m_Meshes[i].MaterialIndex = pScene->mMeshes[i]->mMaterialIndex;
@@ -101,7 +112,7 @@ void BaseMesh::CountVerticesAndIndices(const aiScene* pScene, unsigned int& NumV
 }
 
 
-void BaseMesh::ReserveSpace(unsigned int NumVertices, unsigned int NumIndices)
+void Mesh::ReserveSpace(unsigned int NumVertices, unsigned int NumIndices)
 {
     m_Positions.reserve(NumVertices);
     m_Normals.reserve(NumVertices);
@@ -110,7 +121,7 @@ void BaseMesh::ReserveSpace(unsigned int NumVertices, unsigned int NumIndices)
 }
 
 
-void BaseMesh::InitAllMeshes(const aiScene* pScene)
+void Mesh::InitAllMeshes(const aiScene* pScene)
 {
     for (unsigned int i = 0; i < m_Meshes.size(); i++) {
         const aiMesh* paiMesh = pScene->mMeshes[i];
@@ -119,7 +130,7 @@ void BaseMesh::InitAllMeshes(const aiScene* pScene)
 }
 
 
-void BaseMesh::InitSingleMesh(const aiMesh* paiMesh)
+void Mesh::InitSingleMesh(const aiMesh* paiMesh)
 {
     const aiVector3D Zero3D(0.0f, 0.0f, 0.0f);
 
@@ -144,7 +155,7 @@ void BaseMesh::InitSingleMesh(const aiMesh* paiMesh)
     }
 }
 
-void BaseMesh::PopulateBuffers()
+void Mesh::PopulateBuffers()
 {
     glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(m_Positions[0]) * m_Positions.size(), &m_Positions[0], GL_STATIC_DRAW);
@@ -165,7 +176,7 @@ void BaseMesh::PopulateBuffers()
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(m_Indices[0]) * m_Indices.size(), &m_Indices[0], GL_STATIC_DRAW);
 }
 
-void BaseMesh::Render()
+void Mesh::Render()
 {
     glBindVertexArray(m_VAO);
 

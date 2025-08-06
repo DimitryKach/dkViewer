@@ -11,17 +11,20 @@ public:
 	float pitch;
 	float roll;
 	float zoom;
-	float lastX;
-	float lastY;
 	Eigen::Vector3f position;
 	Eigen::Vector3f centerOfInterest;
 	Eigen::Vector3f target;
 	Eigen::Vector3f up;
+	Eigen::Matrix4f projectionMtx;
 	bool doRotate;
 	bool doPan;
 	bool active;
+	float FOV;
+	float ASPECT_RATIO;
+	float NEAR;
+	float FAR;
+	float TIME_STATE_MULT;
 
-	void setupProjectionMtx();
 	Eigen::Matrix4f getMtx();
 	void zoomFwd(const float delta);
 	void moveFwd(const float delta);
@@ -38,6 +41,8 @@ public:
 	void handleMouseMotion(double inX, double inY);
 	void handleMouseScroll(double amount);
 	void rotateTarget();
+	void updateLastPos(const float& xpos, const float& ypos);
+	void updateProjMtx();
 
 	Camera()
 	{
@@ -54,5 +59,9 @@ public:
 		active = false;
 	}
 	~Camera() = default;
+private:
+	float lastX;
+	float lastY;
+	Eigen::Matrix4f CalcProjectionMtx();
 };
 
