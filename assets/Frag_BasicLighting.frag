@@ -7,7 +7,7 @@ in vec3 LightPos;
 out vec4 color;
 
 uniform sampler2D texture1;
-uniform sampler2D texture2;
+uniform bool hasTexture;
 uniform vec3 lightColor;
 //uniform vec3 viewPos;
 
@@ -16,10 +16,12 @@ vec2 FlipTexCoord;
 void main()
 {
     FlipTexCoord = vec2(TexCoord.x, 1.0 - TexCoord.y);
-    vec4 tx1 = texture(texture1, TexCoord);
-    vec4 tx2 = texture(texture2, FlipTexCoord);
-    //color = mix(tx1, tx2, tx2.w*0.5);
     color = vec4(0.5, 0.5, 0.5, 1.0);
+    if (hasTexture)
+    {
+        color = texture(texture1, TexCoord);
+    }
+    //color = mix(tx1, tx2, tx2.w*0.5);
 
     // Lets shade this bad boy!
     vec3 norm = normalize(Normal);

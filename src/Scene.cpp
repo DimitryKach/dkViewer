@@ -16,32 +16,15 @@ Scene::Scene() : SCR_WIDTH(1000), SCR_HEIGHT(600), TIME_STATE_MULT(1.0f), title(
 
 Scene::~Scene()
 {
-    for (auto& shader : shaders)
-    {
-        shader->del();
-    }
 }
 
 std::shared_ptr<Mesh> Scene::LoadModel(const std::string& file_path)
 {
-    std::shared_ptr<Mesh> newMesh = std::make_shared<Mesh>();
+    std::shared_ptr<Mesh> newMesh = static_cast<bool>(texMgr) ? std::make_shared<Mesh>(texMgr) : std::make_shared<Mesh>();
     if (!newMesh->LoadFile(file_path))
     {
         return nullptr;
     };
     models.push_back(newMesh);
     return newMesh;
-}
-
-std::shared_ptr<Shader> Scene::CreateShader(const char* vertexShaderPath, const char* fragShaderPath)
-{
-    std::shared_ptr<Shader> shader = std::make_shared<Shader>(vertexShaderPath, fragShaderPath);
-    shaders.push_back(shader);
-    return shader;
-}
-
-void Scene::AddTextureToShader(unsigned int id, std::shared_ptr<Shader> shader)
-{
-    if (!shader) return;
-    shader->addTexture(id);
 }

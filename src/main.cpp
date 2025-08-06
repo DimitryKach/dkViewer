@@ -34,10 +34,11 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 Scene* MyScene = NULL;
-TextureManager* TexManager = NULL;
 
 void setupScene(Scene* scene)
 {
+    // Create a TextureManager to automatically load texture when materials are loaded in models
+    MyScene->texMgr = std::make_shared<TextureManager>();
     //////////////////// MESH SETUP /////////////////////////
     auto modelPath = std::filesystem::path(g_assets_folder) / "spider.obj";
     auto Mesh = MyScene->LoadModel(modelPath.string().c_str());
@@ -46,30 +47,17 @@ void setupScene(Scene* scene)
     auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
     auto fragShaderPath = std::filesystem::path(g_assets_folder) / "Frag_BasicLighting.frag";
 
-    auto shader = MyScene->CreateShader(
+    std::shared_ptr<Shader> shader = std::make_shared<Shader>(
         vertShaderPath.string().c_str(),
-        fragShaderPath.string().c_str()
-        );
+        fragShaderPath.string().c_str());
 
     if (Mesh)
     {
-        Mesh->SetShader(shader);
+        Mesh->m_shader = shader;
     }
-
-    ////////////////// TEXTURE SETUP ///////////////////////
-    TexManager = new TextureManager();
-    std::vector<std::string> texturePaths = {
-        "C:/Users/dimit/Downloads/container.jpg",
-        "C:/Users/dimit/Downloads/awesomeface.png"
-    };
-    for (auto& texPath : texturePaths)
-    {
-        unsigned int id;
-        if (TexManager->loadTexture(texPath, id))
-        {
-            shader->addTexture(id);
-        }
-    }
+    shader->use();
+    shader->setInt("texture1", 0);
+    shader->setBool("hasTexture", true);
 }
 
 int main()
@@ -209,20 +197,19 @@ int main()
         }*/
         for (auto& mesh : MyScene->models)
         {
-            auto shader = mesh->GetShader();
-            shader->use();
+            mesh->m_shader->use();
             Eigen::Matrix4f final = MyScene->camera->projectionMtx * viewMtx * modelMtx;
 
             // Bind view and projection matrices
-            shader->setMat4("model", modelMtx.data());
-            shader->setMat4("view", viewMtx.data());
-            shader->setMat4("projection", MyScene->camera->projectionMtx.data());
+            mesh->m_shader->setMat4("model", modelMtx.data());
+            mesh->m_shader->setMat4("view", viewMtx.data());
+            mesh->m_shader->setMat4("projection", MyScene->camera->projectionMtx.data());
             // Bind the light color and pos
             Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
-            shader->setVec3("lightColor", lightColor.data());
+            mesh->m_shader->setVec3("lightColor", lightColor.data());
             Eigen::Vector3f lightPos = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
             lightPos = viewMtx.topLeftCorner<3, 3>().inverse() * MyScene->camera->position;
-            shader->setVec3("lightPos", lightPos.data());
+            mesh->m_shader->setVec3("lightPos", lightPos.data());
             //shader.setMat4("transform", final.data());
             mesh->Render();
         }

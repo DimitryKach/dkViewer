@@ -1,5 +1,5 @@
 #include "Mesh.h"
-#include "Shader.h"
+#include <filesystem>
 
 #define SAFE_DELETE(p) if (p) { delete p; p = NULL; }
 #define ARRAY_SIZE_IN_ELEMENTS(a) (sizeof(m_Buffers)/sizeof(m_Buffers[0]))
@@ -13,17 +13,6 @@ Mesh::~Mesh()
 {
     Clear();
 }
-
-void Mesh::SetShader(const std::shared_ptr <Shader> shader)
-{
-    m_shader = shader;
-}
-
-std::shared_ptr <Shader> Mesh::GetShader()
-{
-    return m_shader;
-}
-
 
 void Mesh::Clear()
 {
@@ -39,6 +28,8 @@ void Mesh::Clear()
         glDeleteVertexArrays(1, &m_VAO);
         m_VAO = 0;
     }
+    m_Materials.clear();
+    m_Meshes.clear();
 }
 
 void Mesh::Draw()
@@ -91,6 +82,8 @@ bool Mesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
     ReserveSpace(NumVertices, NumIndices);
 
     InitAllMeshes(pScene);
+
+    InitMaterials(pScene, Filename);
 
     PopulateBuffers();
 
@@ -155,6 +148,57 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
     }
 }
 
+bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
+{
+    // Extract the directory part from the file name
+    std::filesystem::path _p(Filename);
+    auto Dir = _p.parent_path();
+
+    bool Ret = true;
+
+    // Initialize the materials
+    for (unsigned int i = 0; i < pScene->mNumMaterials; i++) {
+
+        const aiMaterial* pMaterial = pScene->mMaterials[i];
+        BasicMaterialEntry material;
+        m_Materials.push_back(material);
+
+        //m_Textures[i] = NULL;
+
+        if (pMaterial->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
+            aiString Path;
+
+            if (pMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &Path, NULL, NULL, NULL, NULL, NULL) == AI_SUCCESS) {
+                std::string p(Path.data);
+
+                if (p.substr(0, 2) == ".\\") {
+                    p = p.substr(2, p.size() - 2);
+                }
+
+                std::string FullPath = (Dir / p).string();
+                std::string state = std::filesystem::exists(FullPath) ? " exists" : " doesn't exist";
+                std::cout << "Path " << FullPath << state << std::endl;
+                material.texturePath = FullPath;
+                if (m_TexMgr)
+                {
+                    unsigned int id;
+                    if (!m_TexMgr->loadTexture(FullPath, id))
+                    {
+                        return false;
+                    }
+                    material.texID = id;
+                }
+                else
+                {
+                    std::cout << "No Texture Manager assigned - skipping the loading of texture " << FullPath << std::endl;
+                }
+            }
+        }
+    }
+
+    return Ret;
+}
+
 void Mesh::PopulateBuffers()
 {
     glBindBuffer(GL_ARRAY_BUFFER, m_Buffers[POS_VB]);
@@ -181,6 +225,13 @@ void Mesh::Render()
     glBindVertexArray(m_VAO);
 
     for (unsigned int i = 0; i < m_Meshes.size(); i++) {
+        unsigned int MaterialIndex = m_Meshes[i].MaterialIndex;
+
+        assert(MaterialIndex < m_Materials.size());
+
+        BasicMaterialEntry* material = &m_Materials[MaterialIndex];
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, material->texID);
 
         glDrawElementsBaseVertex(GL_TRIANGLES,
             m_Meshes[i].NumIndices,

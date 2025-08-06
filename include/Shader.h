@@ -65,16 +65,9 @@ public:
     unsigned int ID;
     void use() {
         glUseProgram(ID);
-        for (unsigned int i = 0; i < m_textureIDs.size(); i++)
-        {
-            setInt(("texture" + std::to_string(i + 1)), m_textureIDs[i]);
-        }
     }
     void del() {
         glDeleteProgram(ID);
-    }
-    void addTexture(unsigned int id) {
-        m_textureIDs.push_back(id);
     }
 
     void setBool(const std::string& name, bool value) const
@@ -120,6 +113,4 @@ public:
             }
         }
     }
-    private:
-        std::vector<unsigned int> m_textureIDs;
 };

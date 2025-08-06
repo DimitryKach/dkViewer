@@ -7,15 +7,37 @@
 #include <Eigen/Geometry>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
-class Shader;
+#include "TextureManager.h"
+#include "Shader.h"
 
 class Mesh
 {
 public:
 	Mesh() {};
+	Mesh(std::shared_ptr<TextureManager> texMgr)
+	{
+		m_TexMgr = texMgr;
+	}
 	~Mesh();
 
+#define INVALID_MATERIAL 0xFFFFFFFF
+	struct BasicMeshEntry {
+		BasicMeshEntry()
+		{
+			NumIndices = 0;
+			BaseVertex = 0;
+			BaseIndex = 0;
+			MaterialIndex = INVALID_MATERIAL;
+		}
+		unsigned int NumIndices;
+		unsigned int BaseVertex;
+		unsigned int BaseIndex;
+		unsigned int MaterialIndex;
+	};
+	struct BasicMaterialEntry {
+		unsigned int texID;
+		std::string texturePath;
+	};
 	void Clear();
 	bool LoadFile(const std::string& file_path);
 	bool InitFromScene(const aiScene* pScene, const std::string& Filename);
@@ -23,13 +45,14 @@ public:
 	void ReserveSpace(unsigned int NumVertices, unsigned int NumIndices);
 	void InitAllMeshes(const aiScene* pScene);
 	void InitSingleMesh(const aiMesh* paiMesh);
-	void SetShader(const std::shared_ptr <Shader> shader);
-	std::shared_ptr <Shader> GetShader();
+	bool InitMaterials(const aiScene* pScene, const std::string& Filename);
+	std::shared_ptr<Shader> m_shader;
 	void Cleanup();
 	void PopulateBuffers();
 	void Render();
 	void Draw();
-#define INVALID_MATERIAL 0xFFFFFFFF
+	std::vector<BasicMeshEntry> m_Meshes;
+	std::vector<BasicMaterialEntry> m_Materials;
 private:
 	enum BUFFER_TYPE {
 		INDEX_BUFFER = 0,
@@ -48,26 +71,11 @@ private:
 		Eigen::Vector2f* uv;
 		Eigen::Vector3f* normal;
 	};
-	struct BasicMeshEntry {
-		BasicMeshEntry()
-		{
-			NumIndices = 0;
-			BaseVertex = 0;
-			BaseIndex = 0;
-			MaterialIndex = INVALID_MATERIAL;
-		}
-
-		unsigned int NumIndices;
-		unsigned int BaseVertex;
-		unsigned int BaseIndex;
-		unsigned int MaterialIndex;
-	};
 	std::vector<Vertex> vertices;
-	std::vector<BasicMeshEntry> m_Meshes;
 	//std::vector<Texture*> m_Textures;
-	std::shared_ptr<Shader> m_shader;
 	std::vector<Eigen::Vector3f> m_Positions;
 	std::vector<Eigen::Vector3f> m_Normals;
 	std::vector<Eigen::Vector2f> m_TexCoords;
 	std::vector<unsigned int> m_Indices;
+	std::shared_ptr<TextureManager> m_TexMgr;
 };
