@@ -53,6 +53,7 @@ public:
 	void Draw();
 	std::vector<BasicMeshEntry> m_Meshes;
 	std::vector<BasicMaterialEntry> m_Materials;
+	bool materials_loaded = false;
 private:
 	enum BUFFER_TYPE {
 		INDEX_BUFFER = 0,

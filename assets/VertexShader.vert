@@ -3,21 +3,22 @@ layout (location = 0) in vec3 position;
 layout (location = 1) in vec2 texCoord;
 layout (location = 2) in vec3 normal;
 
-out vec2 TexCoord;
-out vec3 Normal;
-out vec3 FragPos;
-out vec3 LightPos;
+out vec2 TexCoord0;
+out vec3 Normal0;
+out vec3 LightPos0;
+out vec3 VertPos0;
 
-uniform mat4 model;
+uniform mat4 MV;
+uniform mat4 MVP;
+uniform mat4 NormalMtx;
 uniform mat4 view;
-uniform mat4 projection;
 uniform vec3 lightPos;
 
 void main()
 {
-    gl_Position = projection * view * model * vec4(position, 1.0);
-    FragPos = vec3(view * model * vec4(position, 1.0));
-    TexCoord = texCoord;
-    Normal = mat3(transpose(inverse(view * model))) * normal;
-    LightPos = vec3(view * vec4(lightPos, 1.0));
+    gl_Position = MVP * vec4(position, 1.0);
+    VertPos0 = vec3(MV * vec4(position, 1.0));
+    TexCoord0 = texCoord;
+    Normal0 = normalize(mat3(NormalMtx) * normal);
+    LightPos0 = lightPos;
 }

@@ -37,27 +37,37 @@ Scene* MyScene = NULL;
 
 void setupScene(Scene* scene)
 {
+    MyScene->SetupGrid();
     // Create a TextureManager to automatically load texture when materials are loaded in models
     MyScene->texMgr = std::make_shared<TextureManager>();
     //////////////////// MESH SETUP /////////////////////////
-    auto modelPath = std::filesystem::path(g_assets_folder) / "spider.obj";
+    auto modelPath = std::filesystem::path(g_assets_folder) / "buddha.obj";
     auto Mesh = MyScene->LoadModel(modelPath.string().c_str());
 
     ////////////////// SHADER SETUP  ///////////////////////
     auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
     auto fragShaderPath = std::filesystem::path(g_assets_folder) / "Frag_BasicLighting.frag";
+    auto geomShaderPath = std::filesystem::path(g_assets_folder) / "GeoWireframe.gs";
+
+    /*std::shared_ptr<Shader> shader = std::make_shared<Shader>(
+        vertShaderPath.string().c_str(),
+        fragShaderPath.string().c_str());*/
 
     std::shared_ptr<Shader> shader = std::make_shared<Shader>(
         vertShaderPath.string().c_str(),
-        fragShaderPath.string().c_str());
+        fragShaderPath.string().c_str(),
+        geomShaderPath.string().c_str());
 
     if (Mesh)
     {
         Mesh->m_shader = shader;
     }
+    Eigen::Vector3f wireColor(1.0f, 0.0f, 0.0f);
     shader->use();
-    shader->setInt("texture1", 0);
-    shader->setBool("hasTexture", true);
+    shader->setVec3("wireColor", wireColor.data());
+    shader->setInt("doWire", 1);
+    /*shader->setInt("texture1", 0);
+    shader->setBool("hasTexture", true);*/
 }
 
 int main()
@@ -181,53 +191,19 @@ int main()
         float time = (float)glfwGetTime();
         Eigen::Matrix4f viewMtx = MyScene->camera->getMtx();
         Eigen::Matrix4f modelMtx = Eigen::Matrix4f::Identity();
-        modelMtx.topLeftCorner<3, 3>() *= 0.1f;
-        
-        //modelMtx.block<3, 3>(0, 0) = Eigen::AngleAxisf(time, Eigen::Vector3f::UnitY()).matrix();
+        //modelMtx.topLeftCorner<3, 3>() *= 0.01f;
 
         // now we do the rendering
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // draw
-        /*for (int texID = 0; texID < textureIDs.size(); texID++)
-        {
-            glActiveTexture(GL_TEXTURE0 + texID);
-            glBindTexture(GL_TEXTURE_2D, texID);
-        }*/
-        for (auto& mesh : MyScene->models)
-        {
-            mesh->m_shader->use();
-            Eigen::Matrix4f final = MyScene->camera->projectionMtx * viewMtx * modelMtx;
-
-            // Bind view and projection matrices
-            mesh->m_shader->setMat4("model", modelMtx.data());
-            mesh->m_shader->setMat4("view", viewMtx.data());
-            mesh->m_shader->setMat4("projection", MyScene->camera->projectionMtx.data());
-            // Bind the light color and pos
-            Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
-            mesh->m_shader->setVec3("lightColor", lightColor.data());
-            Eigen::Vector3f lightPos = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
-            lightPos = viewMtx.topLeftCorner<3, 3>().inverse() * MyScene->camera->position;
-            mesh->m_shader->setVec3("lightPos", lightPos.data());
-            //shader.setMat4("transform", final.data());
-            mesh->Render();
-        }
+        MyScene->Render(viewMtx, modelMtx);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); 
 
         // update buffer
         glfwSwapBuffers(window);
     }
-
-    //glDeleteVertexArrays(1, &VAO);
-    //glDeleteBuffers(1, &VBO);
-    //glDeleteBuffers(1, &EBO);
-    /*for (int texID = 0; texID < textureIDs.size(); texID++)
-    {
-        unsigned int _texID = texID;
-        glDeleteTextures(1, &_texID);
-    }*/
     
     glfwTerminate();
     return 0;

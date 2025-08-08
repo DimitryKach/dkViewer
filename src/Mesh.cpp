@@ -83,7 +83,7 @@ bool Mesh::InitFromScene(const aiScene* pScene, const std::string& Filename)
 
     InitAllMeshes(pScene);
 
-    InitMaterials(pScene, Filename);
+    materials_loaded = InitMaterials(pScene, Filename);
 
     PopulateBuffers();
 
@@ -150,6 +150,11 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
 
 bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 {
+    if (!m_TexMgr)
+    {
+        std::cout << "Material loading can only be done with an attached TextureManager." << std::endl;
+        return false;
+    }
     // Extract the directory part from the file name
     std::filesystem::path _p(Filename);
     auto Dir = _p.parent_path();
@@ -158,10 +163,8 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 
     // Initialize the materials
     for (unsigned int i = 0; i < pScene->mNumMaterials; i++) {
-
         const aiMaterial* pMaterial = pScene->mMaterials[i];
         BasicMaterialEntry material;
-        m_Materials.push_back(material);
 
         //m_Textures[i] = NULL;
 
@@ -176,24 +179,22 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
                 }
 
                 std::string FullPath = (Dir / p).string();
-                std::string state = std::filesystem::exists(FullPath) ? " exists" : " doesn't exist";
-                std::cout << "Path " << FullPath << state << std::endl;
+                if (!std::filesystem::exists(FullPath))
+                {
+                    std::cout << "The provided texture " << FullPath << " doesn't exist" << std::endl;
+                    m_Materials.push_back(material);
+                    continue;
+                }
                 material.texturePath = FullPath;
-                if (m_TexMgr)
+                unsigned int id;
+                if (!m_TexMgr->loadTexture(FullPath, id))
                 {
-                    unsigned int id;
-                    if (!m_TexMgr->loadTexture(FullPath, id))
-                    {
-                        return false;
-                    }
-                    material.texID = id;
+                    return false;
                 }
-                else
-                {
-                    std::cout << "No Texture Manager assigned - skipping the loading of texture " << FullPath << std::endl;
-                }
+                material.texID = id;
             }
         }
+        m_Materials.push_back(material);
     }
 
     return Ret;

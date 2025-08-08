@@ -4,7 +4,7 @@
 #include "Camera.h"
 #include "Shader.h"
 
-Scene::Scene() : SCR_WIDTH(1000), SCR_HEIGHT(600), TIME_STATE_MULT(1.0f), title("LearnOpenGL")
+Scene::Scene() : SCR_WIDTH(1280), SCR_HEIGHT(720), TIME_STATE_MULT(1.0f), title("LearnOpenGL")
 {
     camera = std::make_shared<Camera>();
     camera->FOV = 90.0f;
@@ -16,6 +16,8 @@ Scene::Scene() : SCR_WIDTH(1000), SCR_HEIGHT(600), TIME_STATE_MULT(1.0f), title(
 
 Scene::~Scene()
 {
+    glDeleteVertexArrays(1, &m_gridVAO);
+    glDeleteBuffers(1, &m_gridVBO);
 }
 
 std::shared_ptr<Mesh> Scene::LoadModel(const std::string& file_path)
@@ -27,4 +29,63 @@ std::shared_ptr<Mesh> Scene::LoadModel(const std::string& file_path)
     };
     models.push_back(newMesh);
     return newMesh;
+}
+
+void Scene::SetupGrid()
+{
+    m_doGrid = true;
+    m_gridVerts.clear();
+    int numPoints = 10;
+    float scale = 100.0f;
+    float step = scale / float(numPoints);
+    for (int i = -numPoints; i <= numPoints; ++i) {
+        // line parallel to X-axis at Z = i
+        m_gridVerts.push_back({ -scale, 0.0f, step * (float)i});
+        m_gridVerts.push_back({ scale, 0.0f, step * (float)i });
+        // line parallel to Z-axis at X = i
+        m_gridVerts.push_back({ step * (float)i, 0.0f, -scale });
+        m_gridVerts.push_back({ step * (float)i, 0.0f,  scale });
+    }
+    glGenVertexArrays(1, &m_gridVAO);
+    glGenBuffers(1, &m_gridVBO);
+    glBindVertexArray(m_gridVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_gridVBO);
+    glBufferData(GL_ARRAY_BUFFER, m_gridVerts.size() * sizeof(Eigen::Vector3f),
+        m_gridVerts.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    glBindVertexArray(0);
+}
+
+void Scene::Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelMtx)
+{
+    if (m_doGrid) DrawGrid();
+    for (auto& mesh : models)
+    {
+        mesh->m_shader->use();
+        Eigen::Matrix4f MV = viewMtx * modelMtx;
+        Eigen::Matrix4f MVP = camera->projectionMtx * MV;
+        Eigen::Matrix4f NormalMtx = MV.inverse().transpose();
+
+        // Bind view and projection matrices
+        mesh->m_shader->setMat4("MVP", MVP.data());
+        mesh->m_shader->setMat4("MV", MV.data());
+        mesh->m_shader->setMat4("NormalMtx", NormalMtx.data());
+        mesh->m_shader->setMat4("ViewMtx", viewMtx.data());
+        // Bind the light color and pos
+        Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+        mesh->m_shader->setVec3("lightColor", lightColor.data());
+        Eigen::Vector3f lightPos = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
+        lightPos = camera->position;
+        mesh->m_shader->setVec3("lightPos", lightPos.data());
+        //shader.setMat4("transform", final.data());
+        mesh->Render();
+    }
+}
+
+void Scene::DrawGrid()
+{
+    glBindVertexArray(m_gridVAO);
+    glDrawArrays(GL_LINES, 0, m_gridVerts.size());
+    glBindVertexArray(0);
 }

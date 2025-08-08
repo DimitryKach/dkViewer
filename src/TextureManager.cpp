@@ -14,6 +14,7 @@ struct TextureData {
 
 bool TextureManager::loadTexture(const std::string& texture_path, unsigned int& id)
 {
+    stbi_set_flip_vertically_on_load(1);
     TextureData texture;
     texture.data = stbi_load(texture_path.c_str(), &texture.width, &texture.height, &texture.nChannels, 0);
     if (!texture.data)
@@ -35,6 +36,7 @@ bool TextureManager::loadTexture(const std::string& texture_path, unsigned int& 
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture.width, texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture.data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
+    glBindTexture(GL_TEXTURE_2D, 0);
     stbi_image_free(texture.data);
     m_allTextureIDs.push_back(id);
     return true;
