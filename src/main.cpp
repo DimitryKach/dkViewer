@@ -41,7 +41,7 @@ void setupScene(Scene* scene)
     // Create a TextureManager to automatically load texture when materials are loaded in models
     MyScene->texMgr = std::make_shared<TextureManager>();
     //////////////////// MESH SETUP /////////////////////////
-    auto modelPath = std::filesystem::path(g_assets_folder) / "buddha.obj";
+    auto modelPath = std::filesystem::path(g_assets_folder) / "plane.obj";
     auto Mesh = MyScene->LoadModel(modelPath.string().c_str());
 
     ////////////////// SHADER SETUP  ///////////////////////
