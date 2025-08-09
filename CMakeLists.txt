@@ -86,9 +86,39 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(assimp)
 
 # ----------------------------------------------------------------------------
-# 8) Eigen (system package)
+# 8) Eigen (find or fetch if missing)
 # ----------------------------------------------------------------------------
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+# Try system/package-manager first
+# ----------------------------------------------------------------------------
+# Eigen (find headers or fetch if missing) -> always provide Eigen3::Eigen
+# ----------------------------------------------------------------------------
+# Try to locate installed headers (vcpkg/system installs usually put them under eigen3/)
+find_path(EIGEN3_INCLUDE_DIR Eigen/Dense
+          PATH_SUFFIXES eigen3 eigen
+          DOC "Path to Eigen3 headers")
+
+if (EIGEN3_INCLUDE_DIR)
+  message(STATUS "Found Eigen headers at: ${EIGEN3_INCLUDE_DIR}")
+  add_library(eigen3_headers INTERFACE)
+  target_include_directories(eigen3_headers INTERFACE "${EIGEN3_INCLUDE_DIR}")
+else()
+  message(STATUS "Eigen3 not found — fetching 3.4.0 via FetchContent")
+  # FetchContent is already included earlier; if not, add: include(FetchContent)
+  FetchContent_Declare(
+    eigen
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+    GIT_TAG        3.4.0
+  )
+  FetchContent_Populate(eigen)
+  add_library(eigen3_headers INTERFACE)
+  target_include_directories(eigen3_headers INTERFACE "${eigen_SOURCE_DIR}")
+endif()
+
+# Expose the canonical target name (only if not already provided by a package)
+if (NOT TARGET Eigen3::Eigen)
+  add_library(Eigen3::Eigen ALIAS eigen3_headers)
+endif()
+
 
 # ----------------------------------------------------------------------------
 # 9) System OpenGL
