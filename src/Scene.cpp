@@ -4,7 +4,7 @@
 #include "Camera.h"
 #include "Shader.h"
 
-Scene::Scene() : SCR_WIDTH(1280), SCR_HEIGHT(720), TIME_STATE_MULT(1.0f), title("LearnOpenGL")
+Scene::Scene() : SCR_WIDTH(2560), SCR_HEIGHT(1440), TIME_STATE_MULT(1.0f), title("LearnOpenGL")
 {
     camera = std::make_shared<Camera>();
     camera->FOV = 90.0f;
@@ -80,6 +80,46 @@ void Scene::Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelM
         mesh->m_shader->setVec3("lightPos", lightPos.data());
         //shader.setMat4("transform", final.data());
         mesh->Render();
+    }
+}
+
+uint32_t Scene::GetNumVerts()
+{
+    unsigned int numVerts = 0;
+    for (auto& model : models)
+    {
+        numVerts += model->GetNumVerts();
+    }
+    return numVerts;
+}
+
+uint32_t Scene::GetNumEdges()
+{
+    unsigned int numEdges = 0;
+    for (auto& model : models)
+    {
+        numEdges += model->GetNumEdges();
+    }
+    return numEdges;
+}
+
+void Scene::ShowWireframe()
+{
+    for (auto& shader : shaders)
+    {
+        m_doWire = true;
+        shader->use();
+        shader->setBool("doWire", m_doWire);
+    }
+}
+
+void Scene::HideWireframe()
+{
+    for (auto& shader : shaders)
+    {
+        m_doWire = false;
+        shader->use();
+        shader->setBool("doWire", m_doWire);
     }
 }
 

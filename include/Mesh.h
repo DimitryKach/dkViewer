@@ -53,6 +53,8 @@ public:
 	void PopulateBuffers();
 	void Render();
 	void Draw();
+	uint32_t GetNumVerts();
+	uint32_t GetNumEdges();
 	std::vector<BasicMeshEntry> m_meshes;
 	std::vector<BasicMaterialEntry> m_materials;
 	bool materials_loaded = false;

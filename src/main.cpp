@@ -26,6 +26,8 @@
 #include "Mesh.h"
 
 static const std::string g_assets_folder = ASSETS_DIR;
+static bool g_ShowStatsOverlay = false;
+static bool g_ShowWireframe = false;
 
 void framebuffer_size_clbk(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -58,6 +60,7 @@ void setupScene(Scene* scene)
         fragShaderPath.string().c_str(),
         geomShaderPath.string().c_str());
 
+    MyScene->shaders.push_back(shader);
     if (Mesh)
     {
         Mesh->m_shader = shader;
@@ -65,7 +68,7 @@ void setupScene(Scene* scene)
     Eigen::Vector3f wireColor(1.0f, 0.0f, 0.0f);
     shader->use();
     shader->setVec3("wireColor", wireColor.data());
-    shader->setInt("doWire", 1);
+    shader->setBool("doWire", g_ShowWireframe);
     /*shader->setInt("texture1", 0);
     shader->setBool("hasTexture", true);*/
 }
@@ -116,6 +119,11 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
+    // 7. Set font size
+    ImGuiStyle& style = ImGui::GetStyle();
+    float s = 1.5f;                     // 150%
+    style.FontScaleMain = s;            
+
     glfwSetFramebufferSizeCallback(window, framebuffer_size_clbk);
 
     //glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
@@ -161,9 +169,35 @@ int main()
 
         // 9. Your own simple window
         {
+            // --- UI: shown every frame ---
+
+            if (g_ShowStatsOverlay) {
+                // draw your overlay window here (every frame)
+                ImGui::SetNextWindowBgAlpha(0.35f);
+                ImGui::Begin("##stats_overlay",
+                    nullptr,
+                    ImGuiWindowFlags_NoDecoration |
+                    ImGuiWindowFlags_AlwaysAutoResize |
+                    ImGuiWindowFlags_NoSavedSettings);
+                ImGui::Text("Vertices: %zu", MyScene->GetNumVerts());
+                ImGui::Text("Edges:    %zu", MyScene->GetNumEdges());
+                ImGui::End();
+            }
             static float f = 0.0f;
             static int counter = 0;
-            ImGui::Begin("Hello, ImGui!");
+            ImGui::Begin("Basic viewport settings");
+            ImGui::Checkbox("Show stats overlay", &g_ShowStatsOverlay);
+            if (ImGui::Checkbox("Show Wireframe", &g_ShowWireframe))
+            {
+                if (g_ShowWireframe)
+                {
+                    MyScene->ShowWireframe();
+                }
+                else
+                {
+                    MyScene->HideWireframe();
+                }
+            }
             // Near plane slider
             if (ImGui::SliderFloat("Near Plane", &MyScene->camera->NEAR, 0.01f, MyScene->camera->FAR - 0.1f, "%.3f")) {
                 MyScene->camera->updateProjMtx();

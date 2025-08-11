@@ -40,6 +40,16 @@ void Mesh::Draw()
     glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
+uint32_t Mesh::GetNumVerts()
+{
+    return uint32_t(m_positions.size());
+}
+
+uint32_t Mesh::GetNumEdges()
+{
+    return uint32_t(m_edges.size());
+}
+
 bool Mesh::LoadFile(const std::string& Filename)
 {
     // Release the previously loaded mesh (if it exists)
@@ -160,7 +170,6 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
             m_edges.insert(e);
         }
     }
-    std::cout << "The mesh has " << m_edges.size() << " edges." << "\n";
 }
 
 bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)

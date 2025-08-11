@@ -22,6 +22,10 @@ public:
     void DrawGrid();
     void SetupGrid();
     void Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelMtx);
+    uint32_t GetNumVerts();
+    uint32_t GetNumEdges();
+    void ShowWireframe();
+    void HideWireframe();
     const unsigned int SCR_WIDTH;
     const unsigned int SCR_HEIGHT;
     const char* title;
@@ -32,4 +36,5 @@ private:
     GLuint m_gridVBO = 0;
     std::vector<Eigen::Vector3f> m_gridVerts;
     bool m_doGrid = true;
+    bool m_doWire = true;
 };
