@@ -40,6 +40,12 @@ public:
 		std::string texturePath;
 	};
 	struct Edge { uint32_t a, b; };
+	// Cool thing I learned - EdgeHash is a hashing functor (defining operator() makes it a functor). We then pass an Edge, which has two
+	// 32-bit integers for the vertex IDs, and we hash them by first ordering each edge by having vId1 < vId2, and then putting vId1 into
+	// the high of the 64 bit hash, and vId2 into the low. This allows us to hash the unordered_set.
+	struct EdgeHash { size_t operator()(const Edge& e) const noexcept { return (uint64_t)e.a << 32 | e.b; } }; // the
+	struct EdgeEq { bool operator()(const Edge& e1, const Edge& e2) const noexcept { return e1.a == e2.a && e1.b == e2.b; } };
+	std::unordered_set<Edge, EdgeHash, EdgeEq> m_edges;
 	void Clear();
 	bool LoadFile(const std::string& file_path);
 	bool InitFromScene(const aiScene* pScene, const std::string& Filename);
@@ -47,12 +53,16 @@ public:
 	void ReserveSpace(unsigned int NumVertices, unsigned int NumIndices);
 	void InitAllMeshes(const aiScene* pScene);
 	void InitSingleMesh(const aiMesh* paiMesh);
+	void SetVertex(const Eigen::Vector3f& pos, uint16_t id);
 	bool InitMaterials(const aiScene* pScene, const std::string& Filename);
+	Eigen::Vector3f GetVertex(uint16_t id);
 	std::shared_ptr<Shader> m_shader;
 	void Cleanup();
 	void PopulateBuffers();
+	void UpdatePositionBuffer();
 	void Render();
 	void Draw();
+	void RecomputeNormals();
 	uint32_t GetNumVerts();
 	uint32_t GetNumEdges();
 	std::vector<BasicMeshEntry> m_meshes;
@@ -84,10 +94,4 @@ private:
 	unsigned int m_numFaces;
 	std::vector<unsigned int> m_indices;
 	std::shared_ptr<TextureManager> m_texMgr;
-	// Cool thing I learned - EdgeHash is a hashing functor (defining operator() makes it a functor). We then pass an Edge, which has two
-	// 32-bit integers for the vertex IDs, and we hash them by first ordering each edge by having vId1 < vId2, and then putting vId1 into
-	// the high of the 64 bit hash, and vId2 into the low. This allows us to hash the unordered_set.
-	struct EdgeHash { size_t operator()(const Edge& e) const noexcept { return (uint64_t)e.a << 32 | e.b; } }; // the
-	struct EdgeEq { bool operator()(const Edge& e1, const Edge& e2) const noexcept { return e1.a == e2.a && e1.b == e2.b; } };
-	std::unordered_set<Edge, EdgeHash, EdgeEq> m_edges;
 };

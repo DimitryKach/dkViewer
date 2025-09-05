@@ -4,10 +4,10 @@
 #include "Camera.h"
 #include "Shader.h"
 
-Scene::Scene() : SCR_WIDTH(2560), SCR_HEIGHT(1440), TIME_STATE_MULT(1.0f), title("LearnOpenGL")
+Scene::Scene() : SCR_WIDTH(2560), SCR_HEIGHT(1440), TIME_STATE_MULT(1.0f), title("DK Viewer")
 {
     camera = std::make_shared<Camera>();
-    camera->FOV = 90.0f;
+    camera->FOV = 45.0f;
     camera->ASPECT_RATIO = (float)SCR_WIDTH / (float)SCR_HEIGHT;
     camera->NEAR = 0.5f;
     camera->FAR = 10.0f;
@@ -62,6 +62,8 @@ void Scene::Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelM
     if (m_doGrid) DrawGrid();
     for (auto& mesh : models)
     {
+        mesh->UpdatePositionBuffer();
+        mesh->RecomputeNormals();
         mesh->m_shader->use();
         Eigen::Matrix4f MV = viewMtx * modelMtx;
         Eigen::Matrix4f MVP = camera->projectionMtx * MV;

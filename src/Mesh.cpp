@@ -142,9 +142,15 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
         return Edge{ u, v };
     };
 
+    auto isCorner = [](const aiVector3D pos) {
+        if (abs(pos.x) < 0.00001f && (abs(abs(pos.y) - 2.1258f) < 0.00001f || abs(abs(pos.y) - 0.1258f) < 0.00001f) && abs(abs(pos.z) - 1.0f) < 0.00001f) return true;
+        return false;
+    };
+
     // Populate the vertex attribute vectors
     for (unsigned int i = 0; i < paiMesh->mNumVertices; i++) {
         const aiVector3D& pPos = paiMesh->mVertices[i];
+        //std::cout << i << " " << pPos.x << " " << pPos.y << " " << pPos.z << std::endl;
         const aiVector3D& pNormal = paiMesh->mNormals[i];
         const aiVector3D& pTexCoord = paiMesh->HasTextureCoords(0) ? paiMesh->mTextureCoords[0][i] : Zero3D;
 
@@ -170,6 +176,35 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
             m_edges.insert(e);
         }
     }
+}
+
+void Mesh::RecomputeNormals()
+{
+    std::fill(m_normals.begin(), m_normals.end(), Eigen::Vector3f::Zero());
+    for (uint16_t i = 0; i < (m_indices.size()/3); i++)
+    {
+        auto v1 = m_positions[m_indices[i * 3]];
+        auto v2 = m_positions[m_indices[i * 3 + 1]];
+        auto v3 = m_positions[m_indices[i * 3 + 2]];
+
+        auto wNorm = (v2 - v1).cross(v3 - v1);
+        m_normals[m_indices[i * 3]] += wNorm;
+        m_normals[m_indices[i * 3 + 1]] += wNorm;
+        m_normals[m_indices[i * 3 + 2]] += wNorm;
+    }
+    // Normalize the normals
+    for (auto& norm : m_normals)
+    {
+        norm.normalize();
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, m_buffers[NORMAL_VB]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(m_normals[0]) * m_normals.size(), nullptr, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(m_normals[0]) * m_normals.size(), &m_normals[0]);
+}
+
+void Mesh::SetVertex(const Eigen::Vector3f& pos, uint16_t id)
+{
+    m_positions[id] = pos;
 }
 
 bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
@@ -224,6 +259,12 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
     return Ret;
 }
 
+Eigen::Vector3f Mesh::GetVertex(uint16_t id)
+{
+    Eigen::Vector3f out = m_positions[id];
+    return out;
+}
+
 void Mesh::PopulateBuffers()
 {
     glBindBuffer(GL_ARRAY_BUFFER, m_buffers[POS_VB]);
@@ -243,6 +284,13 @@ void Mesh::PopulateBuffers()
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_buffers[INDEX_BUFFER]);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(m_indices[0]) * m_indices.size(), &m_indices[0], GL_STATIC_DRAW);
+}
+
+void Mesh::UpdatePositionBuffer()
+{
+    glBindBuffer(GL_ARRAY_BUFFER, m_buffers[POS_VB]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(m_positions[0]) * m_positions.size(), nullptr, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(m_positions[0]) * m_positions.size(), &m_positions[0]);
 }
 
 void Mesh::Render()

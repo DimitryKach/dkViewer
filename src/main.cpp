@@ -24,10 +24,12 @@
 #include "Scene.h"
 #include "Camera.h"
 #include "Mesh.h"
+#include "SpringSolver.h"
 
 static const std::string g_assets_folder = ASSETS_DIR;
 static bool g_ShowStatsOverlay = false;
 static bool g_ShowWireframe = false;
+static bool g_DoSim = false;
 
 void framebuffer_size_clbk(GLFWwindow* window, int width, int height);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -36,6 +38,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 Scene* MyScene = NULL;
+SpringSolver* SpSolve = NULL;
 
 void setupScene(Scene* scene)
 {
@@ -43,8 +46,9 @@ void setupScene(Scene* scene)
     // Create a TextureManager to automatically load texture when materials are loaded in models
     MyScene->texMgr = std::make_shared<TextureManager>();
     //////////////////// MESH SETUP /////////////////////////
-    auto modelPath = std::filesystem::path(g_assets_folder) / "plane.obj";
-    auto Mesh = MyScene->LoadModel(modelPath.string().c_str());
+    auto modelPath = std::filesystem::path(g_assets_folder) / "plane3.obj";
+    auto MyMesh = MyScene->LoadModel(modelPath.string().c_str());
+    SpSolve->setup(MyMesh);
 
     ////////////////// SHADER SETUP  ///////////////////////
     auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
@@ -61,9 +65,9 @@ void setupScene(Scene* scene)
         geomShaderPath.string().c_str());
 
     MyScene->shaders.push_back(shader);
-    if (Mesh)
+    if (MyMesh)
     {
-        Mesh->m_shader = shader;
+        MyMesh->m_shader = shader;
     }
     Eigen::Vector3f wireColor(1.0f, 0.0f, 0.0f);
     shader->use();
@@ -83,6 +87,7 @@ int main()
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     
     MyScene = new Scene(); // This creates a default camera
+    SpSolve = new SpringSolver();
 
     GLFWwindow* window = glfwCreateWindow(MyScene->SCR_WIDTH, MyScene->SCR_HEIGHT, MyScene->title, NULL, NULL);
     if (window == NULL)
@@ -209,13 +214,19 @@ int main()
             if (ImGui::SliderFloat("FOV", &MyScene->camera->FOV, 0.1f, 180.0f, "%.3f")) {
                 MyScene->camera->updateProjMtx();
             }
+            ImGui::SliderFloat("k", &SpSolve->k, 1.0f, 100.0f, "%.f");
+            ImGui::SliderFloat("beta_s", &SpSolve->beta_s, 0.01f, 2.0f, "%.3f");
+            ImGui::SliderFloat("beta_g", &SpSolve->beta_g, 0.0001f, 0.01f, "%.3f");
+            ImGui::SliderFloat("mass", &SpSolve->mass, 0.01f, 2.0f, "%.3f");
+            ImGui::SliderFloat("dt", &SpSolve->dt, 0.001f, 0.1f, "%.3f");
+            ImGui::SliderFloat("globalScale", &SpSolve->globalScale, 0.001f, 1.0f, "%.3f");
+            ImGui::Checkbox("Enable Sim", &SpSolve->doSim);
             /*ImGui::Text("This is a basic ImGui window.");
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-            if (ImGui::Button("Button")) counter++;
+            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);*/
+            if (ImGui::Button("Button"))SpSolve->reset();
             ImGui::SameLine();
-            ImGui::Text("Counter = %d", counter);
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);*/
+                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
             ImGui::End();
         }
 
@@ -226,6 +237,7 @@ int main()
         Eigen::Matrix4f viewMtx = MyScene->camera->getMtx();
         Eigen::Matrix4f modelMtx = Eigen::Matrix4f::Identity();
         //modelMtx.topLeftCorner<3, 3>() *= 0.01f;
+        SpSolve->step();
 
         // now we do the rendering
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);

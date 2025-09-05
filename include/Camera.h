@@ -46,7 +46,7 @@ public:
 
 	Camera()
 	{
-		position = Eigen::Vector3f(0.0f, 0.0f, 2.0f);
+		position = Eigen::Vector3f(0.0f, 0.0f, 5.0f);
 		target = position;
 		centerOfInterest = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
 		up = Eigen::Vector3f::UnitY();
