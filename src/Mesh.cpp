@@ -1,5 +1,8 @@
+#define TINYOBJLOADER_IMPLEMENTATION
 #include "Mesh.h"
 #include <filesystem>
+#include <map>
+#include <unordered_map>
 
 #define SAFE_DELETE(p) if (p) { delete p; p = NULL; }
 #define ARRAY_SIZE_IN_ELEMENTS(a) (sizeof(a)/sizeof(a[0]))
@@ -52,6 +55,7 @@ uint32_t Mesh::GetNumEdges()
 
 bool Mesh::LoadFile(const std::string& Filename)
 {
+    std::cout << "Using Assimp to load" << Filename << std::endl;
     // Release the previously loaded mesh (if it exists)
     Clear();
 
@@ -163,16 +167,13 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
     m_numFaces = paiMesh->mNumFaces;
     for (unsigned int i = 0; i < m_numFaces; i++) {
         const aiFace& Face = paiMesh->mFaces[i];
-        assert(Face.mNumIndices == 3);
-        const uint32_t v0 = Face.mIndices[0], v1 = Face.mIndices[1], v2 = Face.mIndices[2];
-        m_indices.push_back(v0);
-        m_indices.push_back(v1);
-        m_indices.push_back(v2);
-        // Populate edges
-        const std::array<std::pair<uint32_t, uint32_t>, 3> _edges{ { {v0,v1}, {v1,v2}, {v2,v0} } };
-        for (auto& [_v1, _v2] : _edges)
+        assert(Face.mNumIndices > 1);
+        for (uint16_t i = 0; i < Face.mNumIndices; i++)
         {
-            Edge e = make_edge(_v1, _v2);
+            uint32_t v0 = Face.mIndices[i];
+            uint32_t v1 = (i == Face.mNumIndices - 1) ? Face.mIndices[0] : Face.mIndices[i + 1];
+            m_indices.push_back(v0);
+            Edge e = make_edge(v0, v1);
             m_edges.insert(e);
         }
     }
@@ -181,7 +182,7 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
 void Mesh::RecomputeNormals()
 {
     std::fill(m_normals.begin(), m_normals.end(), Eigen::Vector3f::Zero());
-    for (uint16_t i = 0; i < (m_indices.size()/3); i++)
+    for (uint16_t i = 0; i < (m_indices.size() / 3); i++)
     {
         auto v1 = m_positions[m_indices[i * 3]];
         auto v2 = m_positions[m_indices[i * 3 + 1]];
@@ -200,6 +201,29 @@ void Mesh::RecomputeNormals()
     glBindBuffer(GL_ARRAY_BUFFER, m_buffers[NORMAL_VB]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(m_normals[0]) * m_normals.size(), nullptr, GL_DYNAMIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(m_normals[0]) * m_normals.size(), &m_normals[0]);
+}
+
+AABB Mesh::ComputeAABB()
+{
+    AABB meshAABB;
+    float minX, maxX = m_positions[0](0);
+    float minY, maxY = m_positions[0](1);
+    float minZ, maxZ = m_positions[0](2);
+    // Find the boundaries
+    for (auto& pos : m_positions)
+    {
+        if (pos(0) < minX) minX = pos(0);
+        if (pos(0) > maxX) maxX = pos(0);
+        if (pos(1) < minY) minY = pos(1);
+        if (pos(1) > maxY) maxY = pos(1);
+        if (pos(2) < minZ) minZ = pos(2);
+        if (pos(2) > maxZ) maxZ = pos(2);
+    }
+    meshAABB.width = maxX - minX;
+    meshAABB.depth = maxY - minY;
+    meshAABB.height = maxZ - minZ;
+
+    return meshAABB;
 }
 
 void Mesh::SetVertex(const Eigen::Vector3f& pos, uint16_t id)
@@ -315,4 +339,186 @@ void Mesh::Render()
 
     // Make sure the VAO is not changed from the outside
     glBindVertexArray(0);
+}
+
+bool Mesh::LoadFileTinyObj(const std::string& Filename)
+{
+    std::cout << "Using TinyObjLoader to load" << Filename << std::endl;
+    // Release the previously loaded mesh (if it exists)
+    Clear();
+
+    // Create the VAO
+    glGenVertexArrays(1, &m_VAO);
+    glBindVertexArray(m_VAO);
+
+    // Create the buffers for the vertices attributes
+    glGenBuffers(ARRAY_SIZE_IN_ELEMENTS(m_buffers), m_buffers);
+
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+
+    std::filesystem::path p(Filename);
+    std::string base_dir = p.parent_path().string() + "/";
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, Filename.c_str(), base_dir.c_str(), false);
+
+    if (!warn.empty()) {
+        std::cout << "TinyObj Warn: " << warn << std::endl;
+    }
+
+    if (!err.empty()) {
+        std::cerr << "TinyObj Err: " << err << std::endl;
+    }
+
+    if (!ret) {
+        return false;
+    }
+
+    // Process materials
+    for (const auto& mat : materials) {
+        BasicMaterialEntry material;
+        if (!mat.diffuse_texname.empty()) {
+            std::string fullPath = base_dir + mat.diffuse_texname;
+            if (std::filesystem::exists(fullPath)) {
+                material.texturePath = fullPath;
+                unsigned int id;
+                if (m_texMgr && m_texMgr->loadTexture(fullPath, id)) {
+                    material.texID = id;
+                }
+            }
+            else {
+                std::cout << "Texture not found: " << fullPath << std::endl;
+            }
+        }
+        m_materials.push_back(material);
+    }
+
+    if (m_materials.empty()) {
+        m_materials.push_back(BasicMaterialEntry());
+    }
+
+    // Map unique vertex attributes to a single index
+    struct IndexCombo {
+        int v_idx, n_idx, t_idx;
+        bool operator==(const IndexCombo& other) const {
+            return v_idx == other.v_idx && n_idx == other.n_idx && t_idx == other.t_idx;
+        }
+    };
+
+    struct IndexComboHash {
+        size_t operator()(const IndexCombo& k) const {
+            return ((std::hash<int>()(k.v_idx) ^ (std::hash<int>()(k.n_idx) << 1)) >> 1) ^ (std::hash<int>()(k.t_idx) << 1);
+        }
+    };
+
+    std::unordered_map<IndexCombo, unsigned int, IndexComboHash> uniqueVertices;
+
+    auto make_edge = [](uint32_t u, uint32_t v) noexcept {
+        if (u > v) std::swap(u, v);
+        return Edge{ u, v };
+    };
+
+    // Map<material_id, vector<indices>>
+    std::map<int, std::vector<unsigned int>> materialToIndices;
+
+    for (const auto& shape : shapes) {
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+            int fv = shape.mesh.num_face_vertices[f];
+            int mat_id = shape.mesh.material_ids[f];
+            if (mat_id < 0) mat_id = 0;
+
+            // Resolve all vertices for this face first
+            std::vector<unsigned int> faceIndices;
+            faceIndices.reserve(fv);
+
+            for (int v = 0; v < fv; v++) {
+                tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
+                IndexCombo combo = { idx.vertex_index, idx.normal_index, idx.texcoord_index };
+
+                if (uniqueVertices.find(combo) == uniqueVertices.end()) {
+                    unsigned int newIdx = (unsigned int)m_positions.size();
+                    uniqueVertices[combo] = newIdx;
+                    faceIndices.push_back(newIdx);
+
+                    // Push vertex data
+                    if (idx.vertex_index >= 0) {
+                        m_positions.push_back(Eigen::Vector3f(
+                            attrib.vertices[3 * idx.vertex_index + 0],
+                            attrib.vertices[3 * idx.vertex_index + 1],
+                            attrib.vertices[3 * idx.vertex_index + 2]
+                        ));
+                    }
+                    else {
+                        m_positions.push_back(Eigen::Vector3f(0, 0, 0));
+                    }
+
+                    if (idx.normal_index >= 0) {
+                        m_normals.push_back(Eigen::Vector3f(
+                            attrib.normals[3 * idx.normal_index + 0],
+                            attrib.normals[3 * idx.normal_index + 1],
+                            attrib.normals[3 * idx.normal_index + 2]
+                        ));
+                    }
+                    else {
+                        m_normals.push_back(Eigen::Vector3f(0, 0, 0));
+                    }
+
+                    if (idx.texcoord_index >= 0) {
+                        m_texCoords.push_back(Eigen::Vector2f(
+                            attrib.texcoords[2 * idx.texcoord_index + 0],
+                            attrib.texcoords[2 * idx.texcoord_index + 1]
+                        ));
+                    }
+                    else {
+                        m_texCoords.push_back(Eigen::Vector2f(0, 0));
+                    }
+                }
+                else {
+                    faceIndices.push_back(uniqueVertices[combo]);
+                }
+            }
+
+            // Triangulate and add edges
+            for (int v = 0; v < fv - 2; v++) {
+                unsigned int i0 = faceIndices[0];
+                unsigned int i1 = faceIndices[v + 1];
+                unsigned int i2 = faceIndices[v + 2];
+
+                materialToIndices[mat_id].push_back(i0);
+                materialToIndices[mat_id].push_back(i1);
+                materialToIndices[mat_id].push_back(i2);
+
+                m_edges.insert(make_edge(i0, i1));
+                m_edges.insert(make_edge(i1, i2));
+                m_edges.insert(make_edge(i2, i0));
+            }
+
+            // Add second shear spring for quads
+            if (fv == 4) {
+                m_edges.insert(make_edge(faceIndices[1], faceIndices[3]));
+            }
+
+            index_offset += fv;
+        }
+    }
+
+    // Now build m_meshes
+    for (auto& it : materialToIndices) {
+        BasicMeshEntry entry;
+        entry.MaterialIndex = it.first;
+        entry.BaseVertex = 0;
+        entry.BaseIndex = (unsigned int)m_indices.size();
+        entry.NumIndices = (unsigned int)it.second.size();
+
+        m_indices.insert(m_indices.end(), it.second.begin(), it.second.end());
+        m_meshes.push_back(entry);
+    }
+
+    materials_loaded = true;
+    PopulateBuffers();
+
+    return GLCheckError();
 }

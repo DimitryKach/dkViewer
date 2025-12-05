@@ -7,9 +7,11 @@
 #include <Eigen/Geometry>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include "tiny_obj_loader.h"
 #include "TextureManager.h"
 #include "Shader.h"
 #include <unordered_set>
+#include "AABB.h"
 
 class Mesh
 {
@@ -63,8 +65,10 @@ public:
 	void Render();
 	void Draw();
 	void RecomputeNormals();
+	AABB ComputeAABB();
 	uint32_t GetNumVerts();
 	uint32_t GetNumEdges();
+	bool LoadFileTinyObj(const std::string& Filename);
 	std::vector<BasicMeshEntry> m_meshes;
 	std::vector<BasicMaterialEntry> m_materials;
 	bool materials_loaded = false;

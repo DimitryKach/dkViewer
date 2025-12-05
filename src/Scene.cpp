@@ -23,7 +23,7 @@ Scene::~Scene()
 std::shared_ptr<Mesh> Scene::LoadModel(const std::string& file_path)
 {
     std::shared_ptr<Mesh> newMesh = static_cast<bool>(texMgr) ? std::make_shared<Mesh>(texMgr) : std::make_shared<Mesh>();
-    if (!newMesh->LoadFile(file_path))
+    if (!newMesh->LoadFileTinyObj(file_path))
     {
         return nullptr;
     };
@@ -60,25 +60,25 @@ void Scene::SetupGrid()
 void Scene::Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelMtx)
 {
     if (m_doGrid) DrawGrid();
+    Eigen::Matrix4f MV = viewMtx * modelMtx;
+    Eigen::Matrix4f MVP = camera->projectionMtx * MV;
+    Eigen::Matrix4f NormalMtx = MV.inverse().transpose();
+    // Static light color - white
+    Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
+    // For now we pin the light to the camera
+    Eigen::Vector3f lightPos = camera->position;
     for (auto& mesh : models)
     {
         mesh->UpdatePositionBuffer();
         mesh->RecomputeNormals();
         mesh->m_shader->use();
-        Eigen::Matrix4f MV = viewMtx * modelMtx;
-        Eigen::Matrix4f MVP = camera->projectionMtx * MV;
-        Eigen::Matrix4f NormalMtx = MV.inverse().transpose();
-
         // Bind view and projection matrices
         mesh->m_shader->setMat4("MVP", MVP.data());
         mesh->m_shader->setMat4("MV", MV.data());
         mesh->m_shader->setMat4("NormalMtx", NormalMtx.data());
         mesh->m_shader->setMat4("ViewMtx", viewMtx.data());
         // Bind the light color and pos
-        Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
         mesh->m_shader->setVec3("lightColor", lightColor.data());
-        Eigen::Vector3f lightPos = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
-        lightPos = camera->position;
         mesh->m_shader->setVec3("lightPos", lightPos.data());
         //shader.setMat4("transform", final.data());
         mesh->Render();

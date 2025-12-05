@@ -5,15 +5,15 @@
 #include <unsupported/Eigen/IterativeSolvers>
 #include <vector>
 
-class SpringSolver {
+class BWClothSolver {
 public:
 	struct Spring
 	{
-		Spring(const Mesh::Edge& e) : edge(&e){}
+		Spring(const Mesh::Edge& e) : edge(&e) {}
 		const Mesh::Edge* edge;
 		float l0;
 	};
-	SpringSolver()
+	BWClothSolver()
 	{
 		k = 30.0f;
 		dt = 0.001f;
@@ -24,25 +24,22 @@ public:
 		doSim = false;
 		vIters = 20;
 		integrator = SolverType::IMPLICIT;
-		totalE = 0.0f;
 		n = 0;
 	}
-	~SpringSolver() = default;
+	~BWClothSolver() = default;
 	void accumulateForces();
 	void accumulatedFdX();
 	void accumulatedFdV();
-	void step();
-	void sparseSetup();
-	void reset();
-	void symplecticSolver();
-	void implicitSolver();
+	//void step();
+	//void sparseSetup();
+	//void reset();
+	//void implicitSolver();
 	bool setup(const std::shared_ptr<Mesh> m);
 	float k;
 	float dt;
 	float mass;
 	float beta_s;
 	float beta_g;
-	float totalE;
 	float globalScale;
 	bool doSim;
 	enum SolverType

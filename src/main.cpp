@@ -46,7 +46,7 @@ void setupScene(Scene* scene)
     // Create a TextureManager to automatically load texture when materials are loaded in models
     MyScene->texMgr = std::make_shared<TextureManager>();
     //////////////////// MESH SETUP /////////////////////////
-    auto modelPath = std::filesystem::path(g_assets_folder) / "plane3.obj";
+    auto modelPath = std::filesystem::path(g_assets_folder) / "plane4.obj";
     auto MyMesh = MyScene->LoadModel(modelPath.string().c_str());
     SpSolve->setup(MyMesh);
 
