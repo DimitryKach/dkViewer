@@ -17,10 +17,7 @@ class Mesh
 {
 public:
 	Mesh() {};
-	Mesh(std::shared_ptr<TextureManager> texMgr)
-	{
-		m_texMgr = texMgr;
-	}
+	Mesh(std::shared_ptr<TextureManager> texMgr);
 	~Mesh();
 
 #define INVALID_MATERIAL 0xFFFFFFFF
@@ -57,7 +54,7 @@ public:
 	void InitSingleMesh(const aiMesh* paiMesh);
 	void SetVertex(const Eigen::Vector3f& pos, uint16_t id);
 	bool InitMaterials(const aiScene* pScene, const std::string& Filename);
-	Eigen::Vector3f GetVertex(uint16_t id);
+	Eigen::Vector3f GetVertex(uint16_t id, bool worldSpace=false);
 	std::shared_ptr<Shader> m_shader;
 	void Cleanup();
 	void PopulateBuffers();
@@ -65,9 +62,14 @@ public:
 	void Render();
 	void Draw();
 	void RecomputeNormals();
+	void SetRecomputeNormals(bool recomp);
 	AABB ComputeAABB();
 	uint32_t GetNumVerts();
 	uint32_t GetNumEdges();
+	uint32_t GetNumTriangles();
+	int* GetTriIndices(const int triId);
+	Eigen::Matrix4f GetModelMtx();
+	void SetModelMtx(const Eigen::Matrix4f& mtx);
 	bool LoadFileTinyObj(const std::string& Filename);
 	std::vector<BasicMeshEntry> m_meshes;
 	std::vector<BasicMaterialEntry> m_materials;
@@ -95,7 +97,10 @@ private:
 	std::vector<Eigen::Vector3f> m_positions;
 	std::vector<Eigen::Vector3f> m_normals;
 	std::vector<Eigen::Vector2f> m_texCoords;
+	Eigen::Matrix4f modelMtx;
 	unsigned int m_numFaces;
+	bool doRecompNormals;
+	// The per-element indices. In most cases - the per-triangle indices
 	std::vector<unsigned int> m_indices;
 	std::shared_ptr<TextureManager> m_texMgr;
 };

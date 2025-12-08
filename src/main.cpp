@@ -47,8 +47,20 @@ void setupScene(Scene* scene)
     MyScene->texMgr = std::make_shared<TextureManager>();
     //////////////////// MESH SETUP /////////////////////////
     auto modelPath = std::filesystem::path(g_assets_folder) / "plane4.obj";
-    auto MyMesh = MyScene->LoadModel(modelPath.string().c_str());
-    SpSolve->setup(MyMesh);
+    MyScene->LoadModel(modelPath.string().c_str());
+    SpSolve->setup(MyScene->models[0]);
+    // Set the cloth normals to recompute
+    MyScene->models[0]->SetRecomputeNormals(true);
+    auto modelPath2 = std::filesystem::path(g_assets_folder) / "sphere.obj";
+    MyScene->LoadModel(modelPath2.string().c_str());
+
+    // Move the sphere down a bit
+    Eigen::Vector3f translation(0.0f, -1.2f, 1.0f);
+    Eigen::Vector3f scale(0.5f, 0.5f, 0.5f);
+    MyScene->TranslateModel(1, translation);
+    MyScene->ScaleModel(1, scale);
+
+    SpSolve->addCollider(MyScene->models[1]);
 
     ////////////////// SHADER SETUP  ///////////////////////
     auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
@@ -65,9 +77,12 @@ void setupScene(Scene* scene)
         geomShaderPath.string().c_str());
 
     MyScene->shaders.push_back(shader);
-    if (MyMesh)
+    for (auto mesh : MyScene->models)
     {
-        MyMesh->m_shader = shader;
+        if (mesh)
+        {
+            mesh->m_shader = shader;
+        }
     }
     Eigen::Vector3f wireColor(1.0f, 0.0f, 0.0f);
     shader->use();
@@ -220,10 +235,13 @@ int main()
             ImGui::SliderFloat("mass", &SpSolve->mass, 0.01f, 2.0f, "%.3f");
             ImGui::SliderFloat("dt", &SpSolve->dt, 0.001f, 0.1f, "%.3f");
             ImGui::SliderFloat("globalScale", &SpSolve->globalScale, 0.001f, 1.0f, "%.3f");
+            ImGui::SliderFloat("collisionTolerance", &SpSolve->colTol, 0.00001f, 1.0f, "%.3f");
             ImGui::Checkbox("Enable Sim", &SpSolve->doSim);
+            ImGui::Checkbox("Enable Collisions", &SpSolve->doCollisions);
             /*ImGui::Text("This is a basic ImGui window.");
             ImGui::SliderFloat("float", &f, 0.0f, 1.0f);*/
             if (ImGui::Button("Button"))SpSolve->reset();
+            if (ImGui::Button("Recalc Normals"))MyScene->models[0]->RecomputeNormals();
             ImGui::SameLine();
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -235,7 +253,6 @@ int main()
         // compute transforms
         float time = (float)glfwGetTime();
         Eigen::Matrix4f viewMtx = MyScene->camera->getMtx();
-        Eigen::Matrix4f modelMtx = Eigen::Matrix4f::Identity();
         //modelMtx.topLeftCorner<3, 3>() *= 0.01f;
         SpSolve->step();
 
@@ -243,7 +260,7 @@ int main()
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        MyScene->Render(viewMtx, modelMtx);
+        MyScene->Render(viewMtx);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); 
 
@@ -262,6 +279,15 @@ void framebuffer_size_clbk(GLFWwindow* window, int width, int height)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+    bool isShift = (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT);
+    if (isShift && action == GLFW_PRESS)
+    {
+        MyScene->camera->setActionMul(10.0f);
+    }
+    if (isShift && action == GLFW_RELEASE)
+    {
+        MyScene->camera->setActionMul(1.0f);
+    }
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     if (key == GLFW_KEY_P && action == GLFW_PRESS)
@@ -275,7 +301,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
     if (key == GLFW_KEY_RIGHT_BRACKET && action == GLFW_PRESS)
     {
-        MyScene->camera->FOV += std::min(180.0f, MyScene->camera->FOV + 2.0f);
+        MyScene->camera->FOV = std::max(0.0f, std::min(180.0f, MyScene->camera->FOV + 2.0f));
         MyScene->camera->updateProjMtx();
     }
     MyScene->camera->handleKeyInputs(key);

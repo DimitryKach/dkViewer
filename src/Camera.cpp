@@ -94,6 +94,16 @@ void Camera::handleMouseButtonInputs(int button, int action)
         active = false;
         doPan = false;
     }
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+    {
+        active = true;
+        doZoom = true;
+    }
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
+    {
+        active = false;
+        doZoom = false;
+    }
 
 }
 
@@ -145,8 +155,8 @@ void Camera::handleMouseMotion(double inX, double inY)
     }
     else if (doPan)
     {
-        dX = dX * 0.05f;
-        dY = dY * 0.05f;
+        dX = dX * 0.05f * actionMul;
+        dY = dY * 0.05f * actionMul;
         if (dX < 0.0f)
             moveRight(-dX);
         else if (dX > 0.0f)
@@ -155,6 +165,14 @@ void Camera::handleMouseMotion(double inX, double inY)
             moveDown(-dY);
         else if (dY > 0.0f)
             moveUp(dY);
+    }
+    else if (doZoom)
+    {
+        dY = dY * 0.05f * actionMul;
+        if (dY > 0.0f)
+            zoomFwd(dY);
+        else if (dY < 0.0f)
+            zoomBwd(-dY);
     }
 }
 
@@ -193,6 +211,11 @@ void Camera::updateLastPos(const float& xpos, const float& ypos)
 void Camera::updateProjMtx()
 {
     projectionMtx = CalcProjectionMtx();
+}
+
+void Camera::setActionMul(float&& val)
+{
+    actionMul = val;
 }
 
 Eigen::Matrix4f Camera::CalcProjectionMtx()

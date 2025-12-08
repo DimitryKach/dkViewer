@@ -12,6 +12,13 @@
 #define TEX_COORD_LOCATION 1
 #define NORMAL_LOCATION    2
 
+Mesh::Mesh(std::shared_ptr<TextureManager> texMgr)
+{
+    m_texMgr = texMgr;
+    doRecompNormals = false;
+    modelMtx = Eigen::Matrix4f::Identity();
+}
+
 Mesh::~Mesh()
 {
     Clear();
@@ -51,6 +58,30 @@ uint32_t Mesh::GetNumVerts()
 uint32_t Mesh::GetNumEdges()
 {
     return uint32_t(m_edges.size());
+}
+
+uint32_t Mesh::GetNumTriangles()
+{
+    return uint32_t(m_indices.size()/3);
+}
+
+int* Mesh::GetTriIndices(const int triId)
+{
+    int* triInds = new int[3];
+    triInds[0] = m_indices[3 * triId];
+    triInds[1] = m_indices[3 * triId + 1];
+    triInds[2] = m_indices[3 * triId + 2];
+    return triInds;
+}
+
+Eigen::Matrix4f Mesh::GetModelMtx()
+{
+    return modelMtx;
+}
+
+void Mesh::SetModelMtx(const Eigen::Matrix4f& mtx)
+{
+    modelMtx = mtx;
 }
 
 bool Mesh::LoadFile(const std::string& Filename)
@@ -182,7 +213,7 @@ void Mesh::InitSingleMesh(const aiMesh* paiMesh)
 void Mesh::RecomputeNormals()
 {
     std::fill(m_normals.begin(), m_normals.end(), Eigen::Vector3f::Zero());
-    for (uint16_t i = 0; i < (m_indices.size() / 3); i++)
+    for (int i = 0; i < (m_indices.size() / 3); i++)
     {
         auto v1 = m_positions[m_indices[i * 3]];
         auto v2 = m_positions[m_indices[i * 3 + 1]];
@@ -192,6 +223,7 @@ void Mesh::RecomputeNormals()
         m_normals[m_indices[i * 3]] += wNorm;
         m_normals[m_indices[i * 3 + 1]] += wNorm;
         m_normals[m_indices[i * 3 + 2]] += wNorm;
+        //std::cout << "i=" << i << std::endl;
     }
     // Normalize the normals
     for (auto& norm : m_normals)
@@ -201,6 +233,11 @@ void Mesh::RecomputeNormals()
     glBindBuffer(GL_ARRAY_BUFFER, m_buffers[NORMAL_VB]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(m_normals[0]) * m_normals.size(), nullptr, GL_DYNAMIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(m_normals[0]) * m_normals.size(), &m_normals[0]);
+}
+
+void Mesh::SetRecomputeNormals(bool recomp)
+{
+    doRecompNormals = recomp;
 }
 
 AABB Mesh::ComputeAABB()
@@ -283,9 +320,11 @@ bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
     return Ret;
 }
 
-Eigen::Vector3f Mesh::GetVertex(uint16_t id)
+Eigen::Vector3f Mesh::GetVertex(uint16_t id, bool worldSpace)
 {
     Eigen::Vector3f out = m_positions[id];
+    if (worldSpace)
+        out = modelMtx.block<3,3>(0,0) * out + modelMtx.block<3, 1>(0, 3);
     return out;
 }
 
@@ -315,6 +354,7 @@ void Mesh::UpdatePositionBuffer()
     glBindBuffer(GL_ARRAY_BUFFER, m_buffers[POS_VB]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(m_positions[0]) * m_positions.size(), nullptr, GL_DYNAMIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(m_positions[0]) * m_positions.size(), &m_positions[0]);
+    if (doRecompNormals) RecomputeNormals();
 }
 
 void Mesh::Render()
@@ -407,14 +447,18 @@ bool Mesh::LoadFileTinyObj(const std::string& Filename)
         }
     };
 
+    // A unique vertex is defined as a unique hash of the position index, the normal index, and the texture index.
+    // This is used by the unordered_map for the hash table.
     struct IndexComboHash {
         size_t operator()(const IndexCombo& k) const {
             return ((std::hash<int>()(k.v_idx) ^ (std::hash<int>()(k.n_idx) << 1)) >> 1) ^ (std::hash<int>()(k.t_idx) << 1);
         }
     };
 
+    // This is the exploded index view for the vertices to be stored within the ARRAY buffer
     std::unordered_map<IndexCombo, unsigned int, IndexComboHash> uniqueVertices;
 
+    // Quick creation of edges
     auto make_edge = [](uint32_t u, uint32_t v) noexcept {
         if (u > v) std::swap(u, v);
         return Edge{ u, v };
@@ -425,20 +469,28 @@ bool Mesh::LoadFileTinyObj(const std::string& Filename)
 
     for (const auto& shape : shapes) {
         size_t index_offset = 0;
+        // Here we go over the face data. We go through a list that contains the number of verts for each face
         for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++) {
+            // This is the current face's number of vertices. We will shift the index_offset by this much later
             int fv = shape.mesh.num_face_vertices[f];
+            // Material IDs are per-face
             int mat_id = shape.mesh.material_ids[f];
             if (mat_id < 0) mat_id = 0;
 
-            // Resolve all vertices for this face first
+            // Resolve all vertices for this face first. We will store NEW face indices that refer to the GLOBAL
+            // indices we are creating with the uniqueVertices unordered_map.
             std::vector<unsigned int> faceIndices;
             faceIndices.reserve(fv);
-
+            // We go through each vertex of the face now
             for (int v = 0; v < fv; v++) {
+                // If I understand correctly, this is the unique TinyObj way of storing face indices so that we
+                // have separate UV and normal data per vertex.
                 tinyobj::index_t idx = shape.mesh.indices[index_offset + v];
                 IndexCombo combo = { idx.vertex_index, idx.normal_index, idx.texcoord_index };
 
                 if (uniqueVertices.find(combo) == uniqueVertices.end()) {
+                    // Note a tricky moment - a vertex that may occupy the SAME position, might have a different
+                    // normal and/or texture coord. Thus, it needs to be stored in the m_positions separately.
                     unsigned int newIdx = (unsigned int)m_positions.size();
                     uniqueVertices[combo] = newIdx;
                     faceIndices.push_back(newIdx);
@@ -481,7 +533,7 @@ bool Mesh::LoadFileTinyObj(const std::string& Filename)
                 }
             }
 
-            // Triangulate and add edges
+            // Triangulate and add edges - we do this like a fan about the first vertex
             for (int v = 0; v < fv - 2; v++) {
                 unsigned int i0 = faceIndices[0];
                 unsigned int i1 = faceIndices[v + 1];
@@ -506,6 +558,7 @@ bool Mesh::LoadFileTinyObj(const std::string& Filename)
     }
 
     // Now build m_meshes
+    // TODO: I have questions about how this might handle multiple materials, but that's for later...
     for (auto& it : materialToIndices) {
         BasicMeshEntry entry;
         entry.MaterialIndex = it.first;
@@ -519,6 +572,7 @@ bool Mesh::LoadFileTinyObj(const std::string& Filename)
 
     materials_loaded = true;
     PopulateBuffers();
+    glBindVertexArray(0);
 
     return GLCheckError();
 }

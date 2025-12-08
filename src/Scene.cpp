@@ -10,7 +10,7 @@ Scene::Scene() : SCR_WIDTH(2560), SCR_HEIGHT(1440), TIME_STATE_MULT(1.0f), title
     camera->FOV = 45.0f;
     camera->ASPECT_RATIO = (float)SCR_WIDTH / (float)SCR_HEIGHT;
     camera->NEAR = 0.5f;
-    camera->FAR = 10.0f;
+    camera->FAR = 50.0f;
     camera->updateProjMtx();
 }
 
@@ -57,20 +57,19 @@ void Scene::SetupGrid()
     glBindVertexArray(0);
 }
 
-void Scene::Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelMtx)
+void Scene::Render(const Eigen::Matrix4f& viewMtx)
 {
     if (m_doGrid) DrawGrid();
-    Eigen::Matrix4f MV = viewMtx * modelMtx;
-    Eigen::Matrix4f MVP = camera->projectionMtx * MV;
-    Eigen::Matrix4f NormalMtx = MV.inverse().transpose();
     // Static light color - white
     Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
     // For now we pin the light to the camera
     Eigen::Vector3f lightPos = camera->position;
-    for (auto& mesh : models)
+    for (auto mesh : models)
     {
+        Eigen::Matrix4f MV = viewMtx * mesh->GetModelMtx();
+        Eigen::Matrix4f MVP = camera->projectionMtx * MV;
+        Eigen::Matrix4f NormalMtx = MV.inverse().transpose();
         mesh->UpdatePositionBuffer();
-        mesh->RecomputeNormals();
         mesh->m_shader->use();
         // Bind view and projection matrices
         mesh->m_shader->setMat4("MVP", MVP.data());
@@ -83,6 +82,28 @@ void Scene::Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelM
         //shader.setMat4("transform", final.data());
         mesh->Render();
     }
+}
+
+void Scene::TranslateModel(const int model_id, Eigen::Vector3f& translation)
+{
+    auto modelMtx = models[model_id]->GetModelMtx();
+    modelMtx.block<3, 1>(0, 3) = translation;
+    models[model_id]->SetModelMtx(modelMtx);
+}
+
+void Scene::RotateModel(const int model_id, Eigen::Matrix3f& rotation)
+{
+}
+
+void Scene::ScaleModel(const int model_id, Eigen::Vector3f& scale)
+{
+    auto modelMtx = models[model_id]->GetModelMtx();
+    modelMtx.diagonal().head<3>() = scale;
+    models[model_id]->SetModelMtx(modelMtx);
+}
+
+void Scene::TransformModel(const int model_id, Eigen::Matrix4f& transform)
+{
 }
 
 uint32_t Scene::GetNumVerts()

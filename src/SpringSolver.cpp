@@ -99,6 +99,13 @@ void SpringSolver::step()
 		implicitSolver();
 		break;
 	}
+	std::cout << "Finished solve..." << std::endl;
+	if (doCollisions)
+	{
+		std::cout << "Starting collisions..." << std::endl;
+		detectCollisions();
+	}
+	std::cout << "Step..." << std::endl;
 }
 
 void SpringSolver::sparseSetup()
@@ -218,4 +225,108 @@ bool SpringSolver::setup(const std::shared_ptr<Mesh> mesh)
 	defaultPos = currPos;
 	lastPos = currPos;
 	return true;
+}
+
+bool triIntersect(const Eigen::Vector3f& src,
+	const Eigen::Vector3f& vtxA,
+	const Eigen::Vector3f& vtxB,
+	const Eigen::Vector3f& vtxC,
+	const Eigen::Vector3f& tNorm,
+	Eigen::Vector3f& hitPoint,
+	float tolerance)
+{
+	Eigen::Vector3f result(0, 0, 0);
+
+	// One of the verts plus the normal define the plane. Compute closest point on plane
+	Eigen::Vector3f pToVtx = vtxA - src;
+	float distToPlane = tNorm.dot(pToVtx);
+	
+	if (abs(distToPlane) > tolerance) return false;
+
+	result = src + tNorm * (distToPlane);
+
+	// Determine if point is inside the triangle
+	bool inside = false;
+
+	Eigen::Vector3f alpha = (vtxB - vtxA).cross(result - vtxA);
+	Eigen::Vector3f beta = (vtxC - vtxB).cross(result - vtxB);
+	Eigen::Vector3f gamma = (vtxA - vtxC).cross(result - vtxC);
+
+	inside = (alpha.dot(tNorm) > 0 && beta.dot(tNorm) > 0 && gamma.dot(tNorm) > 0);
+
+	if (inside)
+		hitPoint = result;
+	return inside;
+}
+
+void SpringSolver::detectCollisions()
+{
+	/*
+	For each collider
+	- get the mesh
+	- for each vertex
+		- for each triangle
+		- get closest point
+		- if close enough and penetrating
+			- push it back along the velocity direction to be on the triangle
+	*/
+	struct CollisionCombo
+	{
+		int srcId;
+		Eigen::Vector3f colNorm;
+		Eigen::Vector3f contactPoint;
+	};
+	struct CollisionComparator {
+		bool operator()(const CollisionCombo& a, const CollisionCombo& b) const {
+			return a.srcId < b.srcId;
+		}
+	};
+	std::set<CollisionCombo, CollisionComparator> collisions;
+	for (auto collider : colliders)
+	{
+		// Brute force first
+		for (int vId=0; vId < currPos.rows()/3; vId++)
+		{
+			Eigen::Vector3f x_i = currPos.segment<3>(vId * 3);
+			for (int i = 0; i < collider->GetNumTriangles(); i++)
+			{
+				int* vIndices = collider->GetTriIndices(i);
+				Eigen::Vector3f vA = collider->GetVertex(vIndices[0], true);
+				Eigen::Vector3f vB = collider->GetVertex(vIndices[1], true);
+				Eigen::Vector3f vC = collider->GetVertex(vIndices[2], true);
+				if ((x_i - vA).squaredNorm() > colTol && (x_i - vB).squaredNorm() > colTol && (x_i - vC).squaredNorm() > colTol)
+				{
+					continue;
+				}
+				Eigen::Vector3f norm = (vB - vA).cross(vC - vA);
+				norm.normalize();
+
+				Eigen::Vector3f hitPoint;
+				if (triIntersect(x_i, vA, vB, vC, norm, hitPoint, colTol))
+				{
+					CollisionCombo col = { vId, norm, hitPoint };
+					collisions.insert(col);
+					//std::cout << "Point " << vId << " hit the collider!" << std::endl;
+				}
+			}
+		}
+
+	}
+	// Resolve Collisions
+	for (auto col : collisions)
+	{
+		auto velVec = currVel.segment<3>(col.srcId * 3);
+		if (col.colNorm.dot(velVec) < 0.0f)
+		{
+			velVec = velVec - col.colNorm * (col.colNorm.dot(velVec));
+			currVel.segment<3>(col.srcId * 3) = velVec;
+		}
+		currPos.segment<3>(col.srcId * 3) = col.contactPoint + col.colNorm * colTol;
+		_mesh->SetVertex(currPos.segment<3>(col.srcId * 3), col.srcId);
+	}
+}
+
+void SpringSolver::addCollider(const std::shared_ptr<Mesh> m)
+{
+	colliders.push_back(m);
 }

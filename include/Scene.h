@@ -21,7 +21,11 @@ public:
     std::shared_ptr<Mesh> LoadModel(const std::string& file_path);
     void DrawGrid();
     void SetupGrid();
-    void Render(const Eigen::Matrix4f& viewMtx, const Eigen::Matrix4f& modelMtx);
+    void Render(const Eigen::Matrix4f& viewMtx);
+    void TranslateModel(const int model_id, Eigen::Vector3f& translation);
+    void RotateModel(const int model_id, Eigen::Matrix3f& rotation);
+    void ScaleModel(const int model_id, Eigen::Vector3f& scale);
+    void TransformModel(const int model_id, Eigen::Matrix4f& transform);
     uint32_t GetNumVerts();
     uint32_t GetNumEdges();
     void ShowWireframe();

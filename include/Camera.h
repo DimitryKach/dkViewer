@@ -18,6 +18,8 @@ public:
 	Eigen::Matrix4f projectionMtx;
 	bool doRotate;
 	bool doPan;
+	bool doDolly;
+	bool doZoom;
 	bool active;
 	float FOV;
 	float ASPECT_RATIO;
@@ -43,6 +45,7 @@ public:
 	void rotateTarget();
 	void updateLastPos(const float& xpos, const float& ypos);
 	void updateProjMtx();
+	void setActionMul(float&& val);
 
 	Camera()
 	{
@@ -57,11 +60,15 @@ public:
 		doRotate = false;
 		doPan = false;
 		active = false;
+		lastX = 0.0f;
+		lastY = 0.0f;
+		actionMul = 1.0f;
 	}
 	~Camera() = default;
 private:
 	float lastX;
 	float lastY;
+	float actionMul;
 	Eigen::Matrix4f CalcProjectionMtx();
 };
 
