@@ -99,13 +99,13 @@ void SpringSolver::step()
 		implicitSolver();
 		break;
 	}
-	std::cout << "Finished solve..." << std::endl;
+	//std::cout << "Finished solve..." << std::endl;
 	if (doCollisions)
 	{
-		std::cout << "Starting collisions..." << std::endl;
+		//std::cout << "Starting collisions..." << std::endl;
 		detectCollisions();
 	}
-	std::cout << "Step..." << std::endl;
+	//std::cout << "Step..." << std::endl;
 }
 
 void SpringSolver::sparseSetup()
