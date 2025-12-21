@@ -1,22 +1,22 @@
 #pragma once
 #include "assimp/scene.h"
-#include <assimp/postprocess.h>
-#include <assimp/Importer.hpp>
+#include "assimp/postprocess.h"
+#include "assimp/Importer.hpp"
 #include <string>
 #include <vector>
-#include <Eigen/Geometry>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include <unordered_set>
+#include "Eigen/Geometry"
+#include "glad/glad.h"
+#include "GLFW/glfw3.h"
 #include "tiny_obj_loader.h"
 #include "TextureManager.h"
 #include "Shader.h"
-#include <unordered_set>
 #include "AABB.h"
 
 class Mesh
 {
 public:
-	Mesh() {};
+	Mesh();
 	Mesh(std::shared_ptr<TextureManager> texMgr);
 	~Mesh();
 
@@ -70,7 +70,7 @@ public:
 	int* GetTriIndices(const int triId);
 	Eigen::Matrix4f GetModelMtx();
 	void SetModelMtx(const Eigen::Matrix4f& mtx);
-	bool LoadFileTinyObj(const std::string& Filename);
+	bool LoadFileTinyObj(const std::string& Filename, bool updateGPUBuffers=true);
 	std::vector<BasicMeshEntry> m_meshes;
 	std::vector<BasicMaterialEntry> m_materials;
 	bool materials_loaded = false;

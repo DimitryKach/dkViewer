@@ -1,9 +1,9 @@
 #pragma once
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include "glad/glad.h"
+#include "GLFW/glfw3.h"
 #include <vector>
 #include <string>
-#include <Eigen/Geometry>
+#include "Eigen/Geometry"
 class Mesh;
 class Camera;
 class Shader;
@@ -26,6 +26,9 @@ public:
     void RotateModel(const int model_id, Eigen::Matrix3f& rotation);
     void ScaleModel(const int model_id, Eigen::Vector3f& scale);
     void TransformModel(const int model_id, Eigen::Matrix4f& transform);
+    void SetGridShader(std::shared_ptr<Shader> _gridShader);
+    void SetShowGrid(bool state);
+    bool IsGridVisible();
     uint32_t GetNumVerts();
     uint32_t GetNumEdges();
     void ShowWireframe();
@@ -39,6 +42,7 @@ private:
     GLuint m_gridVAO = 0;
     GLuint m_gridVBO = 0;
     std::vector<Eigen::Vector3f> m_gridVerts;
+    std::shared_ptr<Shader> gridShader;
     bool m_doGrid = true;
     bool m_doWire = true;
 };

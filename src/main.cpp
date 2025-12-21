@@ -55,7 +55,7 @@ void setupScene(Scene* scene)
     MyScene->LoadModel(modelPath2.string().c_str());
 
     // Move the sphere down a bit
-    Eigen::Vector3f translation(0.0f, -1.2f, 1.0f);
+    Eigen::Vector3f translation(0.0f, -0.8f, -0.2f);
     Eigen::Vector3f scale(0.5f, 0.5f, 0.5f);
     MyScene->TranslateModel(1, translation);
     MyScene->ScaleModel(1, scale);
@@ -65,6 +65,7 @@ void setupScene(Scene* scene)
     ////////////////// SHADER SETUP  ///////////////////////
     auto vertShaderPath = std::filesystem::path(g_assets_folder) / "VertexShader.vert";
     auto fragShaderPath = std::filesystem::path(g_assets_folder) / "Frag_BasicLighting.frag";
+    auto uniformFragShaderPath = std::filesystem::path(g_assets_folder) / "Frag_Uniform.frag";
     auto geomShaderPath = std::filesystem::path(g_assets_folder) / "GeoWireframe.gs";
 
     /*std::shared_ptr<Shader> shader = std::make_shared<Shader>(
@@ -76,6 +77,12 @@ void setupScene(Scene* scene)
         fragShaderPath.string().c_str(),
         geomShaderPath.string().c_str());
 
+    std::shared_ptr<Shader> gridShader = std::make_shared<Shader>(
+        vertShaderPath.string().c_str(),
+        uniformFragShaderPath.string().c_str());
+
+    MyScene->SetGridShader(gridShader);
+
     MyScene->shaders.push_back(shader);
     for (auto mesh : MyScene->models)
     {
@@ -83,11 +90,15 @@ void setupScene(Scene* scene)
         {
             mesh->m_shader = shader;
         }
+    
     }
-    Eigen::Vector3f wireColor(1.0f, 0.0f, 0.0f);
+    Eigen::Vector3f wireColor(1.0f, 1.0f, 1.0f);
     shader->use();
     shader->setVec3("wireColor", wireColor.data());
     shader->setBool("doWire", g_ShowWireframe);
+    Eigen::Vector3f gridColor(0.0f, 0.0f, 0.0f);
+    gridShader->use();
+    gridShader->setVec3("ourColor", gridColor.data());
     /*shader->setInt("texture1", 0);
     shader->setBool("hasTexture", true);*/
 }
@@ -218,6 +229,11 @@ int main()
                     MyScene->HideWireframe();
                 }
             }
+            bool showGrid = MyScene->IsGridVisible();
+            if (ImGui::Checkbox("Show Grid", &showGrid))
+            {
+                MyScene->SetShowGrid(showGrid);
+            }
             // Near plane slider
             if (ImGui::SliderFloat("Near Plane", &MyScene->camera->NEAR, 0.01f, MyScene->camera->FAR - 0.1f, "%.3f")) {
                 MyScene->camera->updateProjMtx();
@@ -229,13 +245,13 @@ int main()
             if (ImGui::SliderFloat("FOV", &MyScene->camera->FOV, 0.1f, 180.0f, "%.3f")) {
                 MyScene->camera->updateProjMtx();
             }
-            ImGui::SliderFloat("k", &SpSolve->k, 1.0f, 100.0f, "%.f");
-            ImGui::SliderFloat("beta_s", &SpSolve->beta_s, 0.01f, 2.0f, "%.3f");
-            ImGui::SliderFloat("beta_g", &SpSolve->beta_g, 0.0001f, 0.01f, "%.3f");
-            ImGui::SliderFloat("mass", &SpSolve->mass, 0.01f, 2.0f, "%.3f");
-            ImGui::SliderFloat("dt", &SpSolve->dt, 0.001f, 0.1f, "%.3f");
-            ImGui::SliderFloat("globalScale", &SpSolve->globalScale, 0.001f, 1.0f, "%.3f");
-            ImGui::SliderFloat("collisionTolerance", &SpSolve->colTol, 0.00001f, 1.0f, "%.3f");
+            ImGui::SliderFloat("Spring Stiffness", &SpSolve->k, 1.0f, 100.0f, "%.f");
+            ImGui::SliderFloat("Spring Dampening", &SpSolve->beta_s, 0.01f, 2.0f, "%.3f");
+            ImGui::SliderFloat("Damping", &SpSolve->beta_g, 0.0001f, 0.01f, "%.3f");
+            ImGui::SliderFloat("Mass", &SpSolve->mass, 0.01f, 2.0f, "%.3f");
+            ImGui::SliderFloat("Step Size", &SpSolve->dt, 0.001f, 0.1f, "%.3f");
+            ImGui::SliderFloat("Global Scale", &SpSolve->globalScale, 0.001f, 1.0f, "%.3f");
+            ImGui::SliderFloat("Collision Tolerance", &SpSolve->colTol, 0.00001f, 1.0f, "%.3f");
             ImGui::Checkbox("Enable Sim", &SpSolve->doSim);
             ImGui::Checkbox("Enable Collisions", &SpSolve->doCollisions);
             /*ImGui::Text("This is a basic ImGui window.");
@@ -275,6 +291,8 @@ int main()
 void framebuffer_size_clbk(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+    MyScene->camera->ASPECT_RATIO = static_cast<float>(width) / static_cast<float>(height);
+    MyScene->camera->updateProjMtx();
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)

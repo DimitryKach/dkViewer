@@ -318,11 +318,14 @@ void SpringSolver::detectCollisions()
 		auto velVec = currVel.segment<3>(col.srcId * 3);
 		if (col.colNorm.dot(velVec) < 0.0f)
 		{
-			velVec = velVec - col.colNorm * (col.colNorm.dot(velVec));
-			currVel.segment<3>(col.srcId * 3) = velVec;
+			currVel.segment<3>(col.srcId * 3) = velVec - col.colNorm * (col.colNorm.dot(velVec));
 		}
-		currPos.segment<3>(col.srcId * 3) = col.contactPoint + col.colNorm * colTol;
-		_mesh->SetVertex(currPos.segment<3>(col.srcId * 3), col.srcId);
+		Eigen::Vector3f posVec = currPos.segment<3>(col.srcId * 3) - col.colNorm;
+		if (col.colNorm.dot(posVec) < 0)
+		{
+			currPos.segment<3>(col.srcId * 3) = col.contactPoint + col.colNorm * colTol;
+			_mesh->SetVertex(currPos.segment<3>(col.srcId * 3), col.srcId);
+		}
 	}
 }
 

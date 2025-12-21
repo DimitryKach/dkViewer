@@ -1,7 +1,7 @@
 #pragma once
 #include "utils.h"
-#include <Eigen/Dense>
-#include <GLFW/glfw3.h>
+#include "Eigen/Dense"
+#include "GLFW/glfw3.h"
 
 class Camera
 {

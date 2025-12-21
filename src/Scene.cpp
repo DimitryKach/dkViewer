@@ -36,7 +36,7 @@ void Scene::SetupGrid()
     m_doGrid = true;
     m_gridVerts.clear();
     int numPoints = 10;
-    float scale = 100.0f;
+    float scale = 10.0f;
     float step = scale / float(numPoints);
     for (int i = -numPoints; i <= numPoints; ++i) {
         // line parallel to X-axis at Z = i
@@ -59,7 +59,19 @@ void Scene::SetupGrid()
 
 void Scene::Render(const Eigen::Matrix4f& viewMtx)
 {
-    if (m_doGrid) DrawGrid();
+    if (m_doGrid)
+    {
+        Eigen::Matrix4f MV = viewMtx * Eigen::Matrix4f::Identity();
+        Eigen::Matrix4f MVP = camera->projectionMtx * MV;
+        Eigen::Matrix4f NormalMtx = MV.inverse().transpose();
+        gridShader->use();
+        // Bind view and projection matrices
+        gridShader->setMat4("MVP", MVP.data());
+        gridShader->setMat4("MV", MV.data());
+        gridShader->setMat4("NormalMtx", NormalMtx.data());
+        gridShader->setMat4("ViewMtx", viewMtx.data());
+        DrawGrid();
+    }
     // Static light color - white
     Eigen::Vector3f lightColor = Eigen::Vector3f(1.0f, 1.0f, 1.0f);
     // For now we pin the light to the camera
@@ -104,6 +116,21 @@ void Scene::ScaleModel(const int model_id, Eigen::Vector3f& scale)
 
 void Scene::TransformModel(const int model_id, Eigen::Matrix4f& transform)
 {
+}
+
+void Scene::SetGridShader(std::shared_ptr<Shader> _gridShader)
+{
+    gridShader = _gridShader;
+}
+
+void Scene::SetShowGrid(bool state)
+{
+    m_doGrid = state;
+}
+
+bool Scene::IsGridVisible()
+{
+    return m_doGrid;
 }
 
 uint32_t Scene::GetNumVerts()

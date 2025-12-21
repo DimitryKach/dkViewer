@@ -12,6 +12,12 @@
 #define TEX_COORD_LOCATION 1
 #define NORMAL_LOCATION    2
 
+Mesh::Mesh()
+{
+    doRecompNormals = false;
+    modelMtx = Eigen::Matrix4f::Identity();
+}
+
 Mesh::Mesh(std::shared_ptr<TextureManager> texMgr)
 {
     m_texMgr = texMgr;
@@ -381,18 +387,14 @@ void Mesh::Render()
     glBindVertexArray(0);
 }
 
-bool Mesh::LoadFileTinyObj(const std::string& Filename)
+bool Mesh::LoadFileTinyObj(const std::string& Filename, bool updateGPUBuffers)
 {
+    // TODO: We need a way to store non-duplicated world positions and indices ALONG
+    //       with the buffer elements. We will need an array that stores GPU vertex
+    //       indices as related to the 
     std::cout << "Using TinyObjLoader to load" << Filename << std::endl;
     // Release the previously loaded mesh (if it exists)
     Clear();
-
-    // Create the VAO
-    glGenVertexArrays(1, &m_VAO);
-    glBindVertexArray(m_VAO);
-
-    // Create the buffers for the vertices attributes
-    glGenBuffers(ARRAY_SIZE_IN_ELEMENTS(m_buffers), m_buffers);
 
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -571,8 +573,18 @@ bool Mesh::LoadFileTinyObj(const std::string& Filename)
     }
 
     materials_loaded = true;
-    PopulateBuffers();
-    glBindVertexArray(0);
+    if (updateGPUBuffers)
+    {
+        // Create the VAO
+        glGenVertexArrays(1, &m_VAO);
+        glBindVertexArray(m_VAO);
 
-    return GLCheckError();
+        // Create the buffers for the vertices attributes
+        glGenBuffers(ARRAY_SIZE_IN_ELEMENTS(m_buffers), m_buffers);
+        PopulateBuffers();
+        glBindVertexArray(0);
+        return GLCheckError();
+    }
+
+    return true;
 }

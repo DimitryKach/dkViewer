@@ -1,8 +1,8 @@
 #pragma once
 #include "Mesh.h"
-#include <Eigen/SparseCore>
-#include <Eigen/SparseLU>
-#include <unsupported/Eigen/IterativeSolvers>
+#include "Eigen/SparseCore"
+#include "Eigen/SparseLU"
+#include "unsupported/Eigen/IterativeSolvers"
 #include <vector>
 
 class BWClothSolver {
