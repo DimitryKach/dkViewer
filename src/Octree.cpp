@@ -1,47 +1,34 @@
 #include "Octree.h"
 #include <numeric>
+#include <cassert>
 
-Octree::Octree(std::vector<Eigen::Vector3f>& vertsPoints, int numLevels, bool precomp)
+Octree::Octree(const float* vertexData, size_t _numVertices, float width, float height, float depth, int _maxLevels, int _maxElems)
 {
-	verts = &vertsPoints;
-	// Initializes one main top cell that will be dynamically refined per-query.
-	float minX = std::numeric_limits<double>::infinity();
-	float minY = std::numeric_limits<double>::infinity();
-	float minZ = std::numeric_limits<double>::infinity();
-	float maxX = -std::numeric_limits<double>::infinity();
-	float maxY = -std::numeric_limits<double>::infinity();
-	float maxZ = -std::numeric_limits<double>::infinity();
-	
-	// use vertex bounds to define the AABB cell
-	for (auto vert : *verts)
+	assert(_maxLevels <= 5 && "Maximum depth support is 5");
+	assert(_maxElems > 0 && "Maximum number of elements needs to be above 0");
+	assert(_numVertices > 0 && "Number of vertices needs to be above 0");
+	maxLevels = _maxLevels;
+	maxElems = _maxElems;
+	numVertices = _numVertices;
+
+	cells.push_back(Cell());
+	Cell* topCell = &cells[0];
+	std::vector<int> _elemIndices(_numVertices);
+	std::iota(_elemIndices.begin(), _elemIndices.end(), 0);
+	// We need to iterate through the elements and generate Element links
+	for (int i=0; i<_elemIndices.size(); i++)
 	{
-		if (vert[0] < minX) minX = vert[0];
-		if (vert[0] > maxX) maxX = vert[0];
-		if (vert[1] < minY) minY = vert[1];
-		if (vert[1] > maxY) maxY = vert[1];
-		if (vert[2] < minZ) minZ = vert[2];
-		if (vert[2] > maxZ) maxZ = vert[2];
+		elements.push_back(Element());
+		Element* elem = &elements[-1];
+		elem->id = _elemIndices[i];
+		elem->nextId = (i < (_elemIndices.size() - 1)) ? elements.size() : -1;
 	}
-
-	float width = maxX - minX;
-	float depth = maxZ - minZ;
-	float height = maxY - minY;
-	// just for fun :) Find the longest side (oh boy is this ugly...)
-	float dim = (width > height) ? ((width > depth) ? width : depth) : ((height > depth) ? height : depth);
-
-	Eigen::Vector3f xp(minX, minY, minZ);
-	
-	auto topCell = std::make_shared<Cell>(xp);
-	topCell->id = -1; // -1 is top cell ID
+	topCell->elementId = 0;
+	topCell->width = width;
+	topCell->height = height;
+	topCell->depth = depth;
 	topCell->level = 0;
-	topCell->pos = xp;
-	std::vector<int> indices(vertsPoints.size());
-	std::iota(indices.begin(), indices.end(), 0);
-	topCell->vIds = std::move(indices);
-
-	cells.push_back(topCell);
-	if (precomp)
-		subdivCell(topCell, numLevels, true);
+	subdivCell(0, vertexData);
 }
 
 Octree::~Octree()
@@ -49,26 +36,56 @@ Octree::~Octree()
 	cells.clear();
 }
 
-void Octree::addVertices(std::vector<int>& vIds, int cellId)
+void Octree::subdivCell(int cellId, const float* vertexData)
 {
-
-}
-
-void Octree::subdivCell(std::shared_ptr<Cell>& cell, int maxLvl, bool recurse)
-{
+	Cell* topCell = &cells[cellId];
+	topCell->childrenIndex = cells.size();
 	for (int i = 0; i < 8; i++)
 	{
-		auto child = std::make_shared<Cell>(cell, i);
-		cell->children.push_back(child);
+		cells.push_back(Cell());
+		Cell* newCell = &cells[-1];
+		newCell->width = topCell->width / 2.0f;
+		newCell->height = topCell->height / 2.0f;
+		newCell->depth = topCell->depth / 2.0f;
+		newCell->parentIndex = cellId;
+		newCell->level = topCell->level + 1;
+		newCell->pos.x = topCell->pos.x + newCell->width * (i & 1);
+		newCell->pos.y = topCell->pos.y + newCell->height * ((i >> 1) & 1);
+		newCell->pos.z = topCell->pos.z + newCell->depth * ((i >> 2) & 1);
 	}
-	// sort the cells vertices into it's leaf nodes.
-	Eigen::Vector3f xp = cell->pos;
-	Eigen::Vector3f xc = xp + Eigen::Vector3f(cell->width / 2.0, cell->height / 2.0, cell->depth / 2.0);
-	for (auto vId : cell->vIds)
+	// sort the topCell's elements into the leaf nodes.
+	Element* currElem = &elements[topCell->elementId];
+	while (currElem->nextId != -1)
 	{
-		Eigen::Vector3f dX = (*verts)[vId] - xc;
-		// Shift and OR
-		// x stays at bit 0 | y shifts to bit 1 | z shifts to bit 2
-		int index = ((dX[0]>0) | ((dX[1]>0) << 1) | ((dX[2]>0) << 2)) + 7*cell->level;
+		float3 vertex;
+		vertex.x = vertexData[3 * currElem->id + 0];
+		vertex.y = vertexData[3 * currElem->id + 1];
+		vertex.z = vertexData[3 * currElem->id + 2];
+		float3 xc;
+		xc.x = topCell->pos.x + topCell->width / 2.0f;
+		xc.y = topCell->pos.y + topCell->height / 2.0f;
+		xc.z = topCell->pos.z + topCell->depth / 2.0f;
+		
+		int index = (vertex.x > xc.x) | ((vertex.y > xc.y) << 1) | ((vertex.z > xc.z) << 2);
+		// Fetch the cell
+		Cell* trgCell = &cells[topCell->childrenIndex + index];
+		// Make a new element on the elements
+		elements.push_back(Element());
+		Element* newElem = &elements[-1];
+		newElem->id = currElem->id;
+		newElem->nextId = -1;
+		// Check if the trgCell has already any elements
+		if (trgCell->elementId != -1)
+		{
+			Element* lastElem = &elements[trgCell->elementId];
+			// We need to traverse till we find the last linked element
+			while (lastElem->nextId != -1)
+			{
+				lastElem = &elements[lastElem->nextId];
+			}
+			// Now that the lastElem has been found, we need to link it to the newElem that we made
+			lastElem->nextId = elements.size();
+		}
+		currElem = &elements[currElem->nextId];
 	}
 }

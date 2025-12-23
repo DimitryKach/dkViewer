@@ -1,53 +1,44 @@
 #include <vector>
-#include "Eigen/Geometry"
 #include <memory>
+
+struct float3 {
+	float x, y, z;
+};
+
+struct Element
+{
+	int id; // -1 means end of linked list
+	int nextId;
+};
 
 struct Cell
 {
-	Cell(Eigen::Vector3f& _pos)
+	Cell()
 	{
-		pos = pos;
+		parentIndex = -1;
+		childrenIndex = -1;
+		elementId = -1;
 	}
-	// Create given a parent
-	Cell(const std::shared_ptr<Cell>& _par, int _localId)
-	{
-		parent = _par;
-		width = _par->width / 2.0;
-		height = _par->height / 2.0;
-		depth = _par->depth / 2.0;
-		float dx = (_localId == 0 || _localId == 2 || _localId == 4 || _localId == 6) ? 0.0f : width;
-		float dy = (_localId == 0 || _localId == 1 || _localId == 4 || _localId == 5) ? 0.0f : height;
-		float dz = (_localId == 0 || _localId == 1 || _localId == 2 || _localId == 3) ? 0.0f : depth;
-		pos = _par->pos + Eigen::Vector3f(dx, dy, dz);
-		id = (_par->id == -1) ? _localId : _par->id + _localId;
-		level = _par->level + 1;
-	}
-	~Cell()
-	{
-		children.clear();
-	}
-	std::shared_ptr<Cell> parent;
-	std::vector<std::shared_ptr<Cell>> children;
-	Eigen::Vector3f position;
-	// TODO: Is this too much memory usage?
-	std::vector<int> vIds;
-	Eigen::Vector3f pos;
+	float3 pos;
 	float width;
 	float height;
 	float depth;
-	int id;
 	int level;
+	int parentIndex;
+	int childrenIndex;
+	int elementId;
 };
 
 class Octree
 {
 public:
-	Octree(std::vector<Eigen::Vector3f>& points, int levels, bool precomp);
+	Octree(const float* vertexData, size_t numVertices, float width, float height, float depth, int _maxLevels, int _maxElems);
 	~Octree();
-	void addVertices(std::vector<int>& vIds, int cellId);
-	void subdivCell(std::shared_ptr<Cell>& cell, int maxLvl, bool recurse);
+	void subdivCell(int cellId, const float* vertexData);
+	std::vector<Cell> cells;
+	std::vector<Element> elements;
 private:
-	std::vector<std::shared_ptr<Cell>> cells;
-	int maxVerts;
-	std::vector<Eigen::Vector3f>* verts;
+	size_t numVertices;
+	int maxElems; // Maximum elements per cell
+	int maxLevels; // Maximum number of levels - we do maximum of 5 for now.
 };

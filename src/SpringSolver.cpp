@@ -166,6 +166,9 @@ void SpringSolver::symplecticSolver()
 void SpringSolver::implicitSolver()
 {
 	// Implicit Euler
+	// TODO: I am currently doing one step at each frame. This makes smaller steps look slower.
+	//       I would like to make all steps move more or less at the same speed, but, with a
+	//       different accuracy that depends on the step size.
 	Eigen::Map<Eigen::VectorXf>(LHS.valuePtr(), LHS.nonZeros()).setZero(); // We need to zero out the matrix but NOT destroy the pattern!
 	// Set the mass to the main sparse matrix
 	for (int i = 0; i < n; ++i) {
