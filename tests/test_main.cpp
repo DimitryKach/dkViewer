@@ -2,6 +2,7 @@
 #include <string>
 #include <filesystem>
 #include <random>
+#include <limits>
 #include "Octree.h"
 #include "Mesh.h"
 
@@ -48,13 +49,81 @@ std::vector<float> GeneratePointsInSphere(int N, float radius) {
 TEST(BasicOctree, OctreeTests)
 {
     // Some basic data
-    std::vector<float> points = GeneratePointsInSphere(10, 4.0f);
-    float width, height, depth = 4.0f;
-    Octree testOctree(points.data(), points.size(), width, height, depth, 1, 4);
-    for (auto elem : testOctree.cells)
+    int numPoints = 10;
+    std::vector<float> points = GeneratePointsInSphere(numPoints, 4.0f);
+    // We need to find the  min/max of X,Y, and Z
+    float minX =  std::numeric_limits<float>::infinity();
+    float minY =  std::numeric_limits<float>::infinity();
+    float minZ =  std::numeric_limits<float>::infinity();
+    float maxX = -std::numeric_limits<float>::infinity();
+    float maxY = -std::numeric_limits<float>::infinity();
+    float maxZ = -std::numeric_limits<float>::infinity();
+
+    // use vertex bounds to define the AABB cell
+    for (int id = 0; id < numPoints; id++)
     {
+        if (points[id*3 + 0] < minX) minX = points[id*3 + 0];
+        if (points[id*3 + 0] > maxX) maxX = points[id*3 + 0];
+        if (points[id*3 + 1] < minY) minY = points[id*3 + 1];
+        if (points[id*3 + 1] > maxY) maxY = points[id*3 + 1];
+        if (points[id*3 + 2] < minZ) minZ = points[id*3 + 2];
+        if (points[id*3 + 2] > maxZ) maxZ = points[id*3 + 2];
+    }
+    float width = maxX - minX + 0.01f;
+    float height = maxY - minY + 0.01f;
+    float depth = maxZ - minZ + 0.01f;
+    // Define the corner
+    float x, y, z;
+    x = minX - 0.005f;
+    y = minY - 0.005f;
+    z = minZ - 0.005f;
+    std::cout << "Creating an Octree with the corner at {" << x << "," << y << "," << z << "}" 
+        << " and dimensions {" << width << "," << height << "," << depth << "}" << std::endl;
+    Octree testOctree(points.data(), numPoints, width, height, depth, x, y, z, 1, 4);
+    for (int i=0; i< testOctree.cells.size(); i++)
+    {
+        Cell* cell = &testOctree.cells[i];
         // We need to write this test to make sure the points we find in the cells are
         // actually within the bounds of the cells
+        std::cout << "Cell ID: "   << i                    << std::endl;
+        std::cout << "   parent="  << cell->parentIndex    << std::endl;
+        std::cout << "   child="   << cell->childrenIndex  << std::endl;
+        float3 cellCenter(cell->pos.x + cell->width / 2.0f,
+                          cell->pos.y + cell->height / 2.0f,
+                          cell->pos.z + cell->width / 2.0f);
+        std::cout << "    pos={" << cell->pos.x << "," << cell->pos.y << "," << cell->pos.z << "}" << std::endl;
+        std::cout << "    center={" << cellCenter.x << "," << cellCenter.y << "," << cellCenter.z << "}" << std::endl;
+        // List elements and positions
+        if (cell->elementId != -1)
+        {
+            std::cout << "Elements:" << std::endl;
+            Element* currElem = &testOctree.elements[cell->elementId];
+            std::cout << "    elementID=" << currElem->id << std::endl;
+            std::cout << "    nextID=" << currElem->nextId << std::endl;
+            float3 elemPos;
+            elemPos.x = points[currElem->id * 3];
+            elemPos.y = points[currElem->id * 3 + 1];
+            elemPos.z = points[currElem->id * 3 + 2];
+            std::cout << "    elementPos={" << elemPos.x << "," << elemPos.y << "," << elemPos.z << "}" << std::endl;
+            bool isInRightCell = ((elemPos.x - cell->pos.x) < cell->width &&
+                (elemPos.y - cell->pos.y) < cell->height &&
+                (elemPos.z - cell->pos.z) < cell->depth);
+            std::cout << "    Right cell? " << isInRightCell << std::endl;
+            while (currElem->nextId != -1)
+            {
+                currElem = &testOctree.elements[currElem->nextId];
+                std::cout << "    elementID=" << currElem->id   << std::endl;
+                std::cout << "    nextID=" << currElem->nextId  << std::endl;
+                elemPos.x = points[currElem->id * 3];
+                elemPos.y = points[currElem->id * 3 + 1];
+                elemPos.z = points[currElem->id * 3 + 2];
+                std::cout << "    elementPos={" << elemPos.x << "," << elemPos.y << "," << elemPos.z << "}" << std::endl;
+                bool isInRightCell = ((elemPos.x - cell->pos.x) < cell->width &&
+                    (elemPos.y - cell->pos.y) < cell->height &&
+                    (elemPos.z - cell->pos.z) < cell->depth);
+                std::cout << "    Right cell? " << isInRightCell << std::endl;
+            }
+        }
     }
     EXPECT_TRUE(true);
 }

@@ -2,7 +2,10 @@
 #include <numeric>
 #include <cassert>
 
-Octree::Octree(const float* vertexData, size_t _numVertices, float width, float height, float depth, int _maxLevels, int _maxElems)
+Octree::Octree(const float* vertexData, size_t _numVertices,
+			   float width, float height, float depth,
+			   float x, float y, float z,
+			   int _maxLevels, int _maxElems)
 {
 	assert(_maxLevels <= 5 && "Maximum depth support is 5");
 	assert(_maxElems > 0 && "Maximum number of elements needs to be above 0");
@@ -11,23 +14,24 @@ Octree::Octree(const float* vertexData, size_t _numVertices, float width, float 
 	maxElems = _maxElems;
 	numVertices = _numVertices;
 
-	cells.push_back(Cell());
-	Cell* topCell = &cells[0];
+	Cell* topCell = new Cell();
 	std::vector<int> _elemIndices(_numVertices);
 	std::iota(_elemIndices.begin(), _elemIndices.end(), 0);
 	// We need to iterate through the elements and generate Element links
 	for (int i=0; i<_elemIndices.size(); i++)
 	{
 		elements.push_back(Element());
-		Element* elem = &elements[-1];
+		Element* elem = &elements.back();
 		elem->id = _elemIndices[i];
-		elem->nextId = (i < (_elemIndices.size() - 1)) ? elements.size() : -1;
+		elem->nextId = (i != (_elemIndices.size() - 1)) ? elements.size() : -1;
 	}
 	topCell->elementId = 0;
 	topCell->width = width;
 	topCell->height = height;
 	topCell->depth = depth;
 	topCell->level = 0;
+	topCell->pos = float3(x, y, z);
+	cells.push_back(*topCell);
 	subdivCell(0, vertexData);
 }
 
@@ -38,42 +42,42 @@ Octree::~Octree()
 
 void Octree::subdivCell(int cellId, const float* vertexData)
 {
-	Cell* topCell = &cells[cellId];
-	topCell->childrenIndex = cells.size();
+	cells[cellId].childrenIndex = cells.size();
 	for (int i = 0; i < 8; i++)
 	{
-		cells.push_back(Cell());
-		Cell* newCell = &cells[-1];
-		newCell->width = topCell->width / 2.0f;
-		newCell->height = topCell->height / 2.0f;
-		newCell->depth = topCell->depth / 2.0f;
+		Cell* newCell = new Cell();
+		newCell->width = cells[cellId].width / 2.0f;
+		newCell->height = cells[cellId].height / 2.0f;
+		newCell->depth = cells[cellId].depth / 2.0f;
 		newCell->parentIndex = cellId;
-		newCell->level = topCell->level + 1;
-		newCell->pos.x = topCell->pos.x + newCell->width * (i & 1);
-		newCell->pos.y = topCell->pos.y + newCell->height * ((i >> 1) & 1);
-		newCell->pos.z = topCell->pos.z + newCell->depth * ((i >> 2) & 1);
+		newCell->level = cells[cellId].level + 1;
+		newCell->pos.x = cells[cellId].pos.x + newCell->width * (i & 1);
+		newCell->pos.y = cells[cellId].pos.y + newCell->height * ((i >> 1) & 1);
+		newCell->pos.z = cells[cellId].pos.z + newCell->depth * ((i >> 2) & 1);
+		cells.push_back(*newCell);
 	}
 	// sort the topCell's elements into the leaf nodes.
-	Element* currElem = &elements[topCell->elementId];
+	Element* currElem = &elements[cells[cellId].elementId];
 	while (currElem->nextId != -1)
 	{
+		int nextId = currElem->nextId;
 		float3 vertex;
 		vertex.x = vertexData[3 * currElem->id + 0];
 		vertex.y = vertexData[3 * currElem->id + 1];
 		vertex.z = vertexData[3 * currElem->id + 2];
 		float3 xc;
-		xc.x = topCell->pos.x + topCell->width / 2.0f;
-		xc.y = topCell->pos.y + topCell->height / 2.0f;
-		xc.z = topCell->pos.z + topCell->depth / 2.0f;
+		xc.x = cells[cellId].pos.x + cells[cellId].width / 2.0f;
+		xc.y = cells[cellId].pos.y + cells[cellId].height / 2.0f;
+		xc.z = cells[cellId].pos.z + cells[cellId].depth / 2.0f;
 		
 		int index = (vertex.x > xc.x) | ((vertex.y > xc.y) << 1) | ((vertex.z > xc.z) << 2);
 		// Fetch the cell
-		Cell* trgCell = &cells[topCell->childrenIndex + index];
+		Cell* trgCell = &cells[cells[cellId].childrenIndex + index];
 		// Make a new element on the elements
-		elements.push_back(Element());
-		Element* newElem = &elements[-1];
+		Element* newElem = new Element();
 		newElem->id = currElem->id;
 		newElem->nextId = -1;
+		elements.push_back(*newElem);
 		// Check if the trgCell has already any elements
 		if (trgCell->elementId != -1)
 		{
@@ -84,8 +88,12 @@ void Octree::subdivCell(int cellId, const float* vertexData)
 				lastElem = &elements[lastElem->nextId];
 			}
 			// Now that the lastElem has been found, we need to link it to the newElem that we made
-			lastElem->nextId = elements.size();
+			lastElem->nextId = elements.size()-1;
 		}
-		currElem = &elements[currElem->nextId];
+		else
+		{
+			trgCell->elementId = elements.size()-1;
+		}
+		currElem = &elements[nextId];
 	}
 }

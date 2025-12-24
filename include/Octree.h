@@ -2,6 +2,13 @@
 #include <memory>
 
 struct float3 {
+	float3() :x(0.0f), y(0.0f), z(0.0f) {};
+	float3(float _x, float _y, float _z)
+	{
+		x = _x;
+		y = _y;
+		z = _z;
+	}
 	float x, y, z;
 };
 
@@ -32,7 +39,10 @@ struct Cell
 class Octree
 {
 public:
-	Octree(const float* vertexData, size_t numVertices, float width, float height, float depth, int _maxLevels, int _maxElems);
+	Octree(const float* vertexData, size_t numVertices,
+		   float width, float height, float depth,
+		   float x, float y, float z,
+		   int _maxLevels, int _maxElems);
 	~Octree();
 	void subdivCell(int cellId, const float* vertexData);
 	std::vector<Cell> cells;
