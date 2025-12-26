@@ -6,11 +6,8 @@
 #include "Octree.h"
 #include "Mesh.h"
 
-TEST(GlobalSetup, BasicAssertion) {
-    EXPECT_TRUE(true);
-}
 
-TEST(MeshLoad, BasicAssertion) {
+TEST(MeshTests, MeshLoad) {
     static const std::string g_assets_folder = "D:/Personal/git/dkViewer/assets";
     auto modelPath = std::filesystem::path(g_assets_folder) / "sphere.obj";
     Mesh testMesh = Mesh();
@@ -46,7 +43,7 @@ std::vector<float> GeneratePointsInSphere(int N, float radius) {
     return points;
 }
 
-TEST(BasicOctree, OctreeTests)
+TEST(OctreeTests, BasicOctree)
 {
     // Some basic data
     int numPoints = 10;
@@ -77,53 +74,38 @@ TEST(BasicOctree, OctreeTests)
     x = minX - 0.005f;
     y = minY - 0.005f;
     z = minZ - 0.005f;
-    std::cout << "Creating an Octree with the corner at {" << x << "," << y << "," << z << "}" 
-        << " and dimensions {" << width << "," << height << "," << depth << "}" << std::endl;
+    bool allElementsWork = true;
     Octree testOctree(points.data(), numPoints, width, height, depth, x, y, z, 1, 4);
     for (int i=0; i< testOctree.cells.size(); i++)
     {
         Cell* cell = &testOctree.cells[i];
         // We need to write this test to make sure the points we find in the cells are
-        // actually within the bounds of the cells
-        std::cout << "Cell ID: "   << i                    << std::endl;
-        std::cout << "   parent="  << cell->parentIndex    << std::endl;
-        std::cout << "   child="   << cell->childrenIndex  << std::endl;
+        // actually within the bounds of the 
         float3 cellCenter(cell->pos.x + cell->width / 2.0f,
                           cell->pos.y + cell->height / 2.0f,
                           cell->pos.z + cell->width / 2.0f);
-        std::cout << "    pos={" << cell->pos.x << "," << cell->pos.y << "," << cell->pos.z << "}" << std::endl;
-        std::cout << "    center={" << cellCenter.x << "," << cellCenter.y << "," << cellCenter.z << "}" << std::endl;
         // List elements and positions
         if (cell->elementId != -1)
         {
-            std::cout << "Elements:" << std::endl;
             Element* currElem = &testOctree.elements[cell->elementId];
-            std::cout << "    elementID=" << currElem->id << std::endl;
-            std::cout << "    nextID=" << currElem->nextId << std::endl;
             float3 elemPos;
             elemPos.x = points[currElem->id * 3];
             elemPos.y = points[currElem->id * 3 + 1];
             elemPos.z = points[currElem->id * 3 + 2];
-            std::cout << "    elementPos={" << elemPos.x << "," << elemPos.y << "," << elemPos.z << "}" << std::endl;
             bool isInRightCell = ((elemPos.x - cell->pos.x) < cell->width &&
                 (elemPos.y - cell->pos.y) < cell->height &&
                 (elemPos.z - cell->pos.z) < cell->depth);
-            std::cout << "    Right cell? " << isInRightCell << std::endl;
             while (currElem->nextId != -1)
             {
                 currElem = &testOctree.elements[currElem->nextId];
-                std::cout << "    elementID=" << currElem->id   << std::endl;
-                std::cout << "    nextID=" << currElem->nextId  << std::endl;
                 elemPos.x = points[currElem->id * 3];
                 elemPos.y = points[currElem->id * 3 + 1];
                 elemPos.z = points[currElem->id * 3 + 2];
-                std::cout << "    elementPos={" << elemPos.x << "," << elemPos.y << "," << elemPos.z << "}" << std::endl;
                 bool isInRightCell = ((elemPos.x - cell->pos.x) < cell->width &&
                     (elemPos.y - cell->pos.y) < cell->height &&
                     (elemPos.z - cell->pos.z) < cell->depth);
-                std::cout << "    Right cell? " << isInRightCell << std::endl;
+                EXPECT_TRUE(isInRightCell);
             }
         }
     }
-    EXPECT_TRUE(true);
 }
