@@ -6,6 +6,7 @@ FetchContent_Declare(
     GIT_TAG v1.14.0
 )
 
+
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
@@ -15,6 +16,10 @@ enable_testing()
 
 add_executable(dkViewerTests
     test_main.cpp
+)
+
+target_compile_definitions(dkViewerTests PRIVATE
+    ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
 )
 
 target_link_libraries(dkViewerTests PRIVATE
