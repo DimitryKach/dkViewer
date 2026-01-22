@@ -1,6 +1,6 @@
-#include "SpringSolver.h"
+#include "EigenSpringSolver.h"
 
-void SpringSolver::accumulateForces()
+void EigenSpringSolver::accumulateForces()
 {
 	totalE = 0.0f;
 	F.setZero();
@@ -35,7 +35,7 @@ void SpringSolver::accumulateForces()
 	//std::cout << "Total E=" << totalE << std::endl;
 }
 
-void SpringSolver::accumulatedFdX()
+void EigenSpringSolver::accumulatedFdX()
 {
 	for (auto& sp : springs)
 	{
@@ -67,7 +67,7 @@ void SpringSolver::accumulatedFdX()
 	}
 }
 
-void SpringSolver::accumulatedFdV()
+void EigenSpringSolver::accumulatedFdV()
 {
 	for (auto& sp : springs)
 	{
@@ -88,7 +88,7 @@ void SpringSolver::accumulatedFdV()
 	}
 }
 
-void SpringSolver::step()
+void EigenSpringSolver::step()
 {
 	if (!doSim) return;
 	switch (integrator) {
@@ -108,7 +108,7 @@ void SpringSolver::step()
 	//std::cout << "Step..." << std::endl;
 }
 
-void SpringSolver::sparseSetup()
+void EigenSpringSolver::sparseSetup()
 {
 	std::vector<Eigen::Triplet<float>> pat;
 	pat.reserve(9 * n + 18 * springs.size());
@@ -137,7 +137,7 @@ void SpringSolver::sparseSetup()
 	bicg.preconditioner().setFillfactor(4);
 }
 
-void SpringSolver::reset()
+void EigenSpringSolver::reset()
 {
 	currPos = defaultPos;
 	lastPos = defaultPos;
@@ -150,7 +150,7 @@ void SpringSolver::reset()
 	}
 }
 
-void SpringSolver::symplecticSolver()
+void EigenSpringSolver::symplecticSolver()
 {
 	accumulateForces();
 	currVel += M_inv * (dt * (F - beta_g * currVel));
@@ -163,7 +163,7 @@ void SpringSolver::symplecticSolver()
 	}
 }
 
-void SpringSolver::implicitSolver()
+void EigenSpringSolver::implicitSolver()
 {
 	// Implicit Euler
 	// TODO: I am currently doing one step at each frame. This makes smaller steps look slower.
@@ -200,7 +200,7 @@ void SpringSolver::implicitSolver()
 
 
 
-bool SpringSolver::setup(const std::shared_ptr<Mesh> mesh)
+bool EigenSpringSolver::setup(const std::shared_ptr<Mesh> mesh)
 {
 	_mesh = mesh;
 	springs.clear();
@@ -262,7 +262,7 @@ bool triIntersect(const Eigen::Vector3f& src,
 	return inside;
 }
 
-void SpringSolver::detectCollisions()
+void EigenSpringSolver::detectCollisions()
 {
 	/*
 	For each collider
@@ -332,7 +332,7 @@ void SpringSolver::detectCollisions()
 	}
 }
 
-void SpringSolver::addCollider(const std::shared_ptr<Mesh> m)
+void EigenSpringSolver::addCollider(const std::shared_ptr<Mesh> m)
 {
 	colliders.push_back(m);
 }

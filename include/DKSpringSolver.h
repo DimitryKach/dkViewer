@@ -1,12 +1,18 @@
 #pragma once
 #include "Mesh.h"
+#include "LinAlgLib.h"
+#include <vector>
+#include <set>
 #include "Eigen/SparseCore"
 #include "Eigen/SparseLU"
 #include "unsupported/Eigen/IterativeSolvers"
-#include <vector>
-#include <set>
 
-class SpringSolver {
+struct SimState {
+	std::vector<float> positions;
+	std::vector<float> velocities;
+};
+
+class DKSpringSolver {
 public:
 	struct Spring
 	{
@@ -14,7 +20,7 @@ public:
 		const Mesh::Edge* edge;
 		float l0;
 	};
-	SpringSolver()
+	DKSpringSolver()
 	{
 		k = 30.0f;
 		dt = 0.001f;
@@ -30,7 +36,7 @@ public:
 		totalE = 0.0f;
 		n = 0;
 	}
-	~SpringSolver() = default;
+	~DKSpringSolver() = default;
 	void accumulateForces();
 	void accumulatedFdX();
 	void accumulatedFdV();
@@ -64,17 +70,17 @@ private:
 	std::shared_ptr<Mesh> _mesh;
 	std::vector<std::shared_ptr<Mesh>> colliders;
 	std::vector<Spring> springs;
-	Eigen::VectorXf currPos;
-	Eigen::VectorXf lastPos;
-	Eigen::VectorXf defaultPos;
-	Eigen::VectorXf currVel;
-	Eigen::VectorXf lastVel;
-	Eigen::VectorXf F;
-	Eigen::MatrixXf M;
+	FVec currPos;
+	FVec lastPos;
+	FVec defaultPos;
+	FVec currVel;
+	FVec lastVel;
+	FVec F;
+	FVec dv;
+	SparseMatrix M;
 	Eigen::MatrixXf M_inv;
 	Eigen::MatrixXf dFdX;
 	Eigen::MatrixXf dFdV;
-	Eigen::VectorXf dv;
 	Eigen::SparseMatrix<float> LHS;
 	Eigen::SparseLU< Eigen::SparseMatrix<float> > lu;
 	Eigen::BiCGSTAB<Eigen::SparseMatrix<float>, Eigen::IncompleteLUT<float>> bicg;

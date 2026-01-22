@@ -177,9 +177,22 @@ TEST(LinearAlgebraTests, MatrixTestCreate)
 
     SparseMatrix spMtx(vals, col_inds, row_ptrs);
 
-    std::cout << spMtx << std::endl;
+    const std::vector<double>* p_vals = spMtx.getValues();
+    const std::vector<int>* p_colInds = spMtx.getColIndices();
+    const std::vector<int>* p_rowPtrs = spMtx.getRowPtrs();
 
-    EXPECT_TRUE(true);
+    for (int i = 0; i < vals.size(); ++i)
+    {
+        EXPECT_DOUBLE_EQ(vals[i], p_vals->at(i));
+    }
+    for (int i = 0; i < col_inds.size(); ++i)
+    {
+        EXPECT_EQ(col_inds[i], p_colInds->at(i));
+    }
+    for (int i = 0; i < row_ptrs.size(); ++i)
+    {
+        EXPECT_EQ(row_ptrs[i], p_rowPtrs->at(i));
+    }
 }
 
 TEST(LinearAlgebraTests, MatrixTestMMul)
@@ -217,12 +230,30 @@ TEST(LinearAlgebraTests, SolveCGTest)
 
 TEST(LinearAlgebraTests, SolveCGTestN50)
 {
-    auto Make1DLaplacian = [](int N) -> SparseMatrix {
+    auto Make1DLaplacian = [](int N) -> DSparseMatrix {
+        // Think of a system of equations for a line of connected springs
+        // |-----o-----o----o------o-----|  |-----> x
+        // Label each spring as a mass m_i, so m_0, m_1, m_2, etc.,
+        // and label the displacements from the rest state as - x_0, x_1, ...
+        // Now let's figure out the forces. Recall F_spring = kx, where x is the displacement from rest.
+        // Assume k=1, and let the rest lengths be all 0. Then, let's find our forces.
+        // For index 0 we have F_0 = -kx_0 + k(x_1-x_0) = -2kx_0 + kx_1
+        // For index 1 we have F_1 = -k(x_1-x_0) + k(x_2 - x_1) = kx_0 - 2kx_1 + kx_2
+        // For index 2 we have F_2 = -k(x_2-x_1) + k(x_3 - x_2) = kx_1 - 2kx_2 + kx_3
+        // ...
+        // For index N we have F_0 = -kx_N - k(x_N-x_(N-1)) = kx_(N-1) - 2kx_N.
+        // Now let's see if we can make that into a matrix and vector output!
+        // Let X = {x_0, x_1, x_2, ..., x_N}, and F be a NxN matrix
+        // Then F[0][0] = -2, F[0][1] = 1, and F[0][2...N] = 0
+        // F[1][0] = 1, F[1][1] = -2, F[1][2] = 1, F[1][3...N] = 0,
+        // F[2][0] = 0, F[2][1] = 1, F[2][2] = -2, F[2][3] = 1, F[2][4...N] = 0,
+        // ...
+        // F[N][0...N-2] = 0, F[N][N-1] = 1, F[N][N] = -2.
+        // That's the matrix we construct.
         std::vector<double> vals;
         std::vector<int> cols;
-        std::vector<int> row_ptrs;
-
-        row_ptrs.push_back(0); // Start of Row 0
+        // We know the size of row_ptrs, so we can pre-allocate
+        std::vector<int> row_ptrs(N+1, 0);
 
         for (int r = 0; r < N; ++r) {
             // Left Neighbor (if not first node)
@@ -242,14 +273,14 @@ TEST(LinearAlgebraTests, SolveCGTestN50)
             }
 
             // Mark end of this row
-            row_ptrs.push_back(vals.size());
+            row_ptrs[r+1] = vals.size();
         }
 
-        return SparseMatrix(vals, cols, row_ptrs);
+        return DSparseMatrix(vals, cols, row_ptrs);
     };
 
     int N = 50; // Size of the system
-    SparseMatrix A = Make1DLaplacian(N);
+    DSparseMatrix A = Make1DLaplacian(N);
 
     // 1. Create the "Truth" (Expected Solution)
     //    We want x to be all 1.0s
@@ -277,5 +308,86 @@ TEST(LinearAlgebraTests, SolveCGTestN50)
     //    Ensure accuracy
     for (int i = 0; i < N; ++i) {
         EXPECT_NEAR(x[i], x_expected[i], 1e-5);
+    }
+}
+
+TEST(LinearAlgebraTests, SparseMatrixConstructFromTriplets)
+{
+    std::vector<double> vals{ 2.0, -1.0, -1.0, 2.0, -1.0, 1.0 };
+    std::vector<int> col_inds{ 0, 1, 0, 1, 2, 3 };
+    std::vector<int> row_ptrs{ 0, 0, 2, 2, 6 };
+    
+    std::vector<SparseMatrix<double>::Triplet> triplets(vals.size());
+
+    for (int r = 0; r < row_ptrs.size()-1; ++r)
+    {
+        for (int val_idx = row_ptrs[r]; val_idx < row_ptrs[r + 1]; ++val_idx)
+        {
+            triplets[val_idx].col = col_inds[val_idx];
+            triplets[val_idx].row = r;
+            triplets[val_idx].value = vals[val_idx];
+        }
+    }
+
+    DSparseMatrix mtx(4);
+    mtx.setFromTriplets(triplets);
+
+    const std::vector<double>* p_vals = mtx.getValues();
+    const std::vector<int>* p_colInds = mtx.getColIndices();
+    const std::vector<int>* p_rowPtrs= mtx.getRowPtrs();
+
+    for (int i = 0; i < vals.size(); ++i)
+    {
+        EXPECT_DOUBLE_EQ(vals[i], p_vals->at(i));
+    }
+    for (int i = 0; i < col_inds.size(); ++i)
+    {
+        EXPECT_EQ(col_inds[i], p_colInds->at(i));
+    }
+    for (int i = 0; i < row_ptrs.size(); ++i)
+    {
+        EXPECT_EQ(row_ptrs[i], p_rowPtrs->at(i));
+    }
+}
+
+TEST(LinearAlgebraTests, SparseMatrixFromTripletsZeroLastRow)
+{
+    // 1 0 0
+    // 0 1 0
+    // 0 0 0
+    std::vector<double> vals{ 1.0, 1.0 };
+    std::vector<int> col_inds{ 0, 1};
+    std::vector<int> row_ptrs{ 0, 1, 2, 2 };
+
+    std::vector<SparseMatrix<double>::Triplet> triplets(vals.size());
+
+    for (int r = 0; r < row_ptrs.size() - 1; ++r)
+    {
+        for (int val_idx = row_ptrs[r]; val_idx < row_ptrs[r + 1]; ++val_idx)
+        {
+            triplets[val_idx].col = col_inds[val_idx];
+            triplets[val_idx].row = r;
+            triplets[val_idx].value = vals[val_idx];
+        }
+    }
+
+    DSparseMatrix mtx(3);
+    mtx.setFromTriplets(triplets);
+
+    const std::vector<double>* p_vals = mtx.getValues();
+    const std::vector<int>* p_colInds = mtx.getColIndices();
+    const std::vector<int>* p_rowPtrs = mtx.getRowPtrs();
+
+    for (int i = 0; i < vals.size(); ++i)
+    {
+        EXPECT_DOUBLE_EQ(vals[i], p_vals->at(i));
+    }
+    for (int i = 0; i < col_inds.size(); ++i)
+    {
+        EXPECT_EQ(col_inds[i], p_colInds->at(i));
+    }
+    for (int i = 0; i < row_ptrs.size(); ++i)
+    {
+        EXPECT_EQ(row_ptrs[i], p_rowPtrs->at(i));
     }
 }
