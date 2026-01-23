@@ -2,6 +2,7 @@
 #include <string>
 #include <filesystem>
 #include <random>
+#include <algorithm>
 #include <limits>
 #include "Octree.h"
 #include "Mesh.h"
@@ -137,7 +138,6 @@ TEST(LinearAlgebraTests, VectorTestMinus)
     DVec testB{ 1.0,2.0,3.0 };
 
     testB[0] = 2.0;
-    std::cout << testB << std::endl;
 
     DVec out = testA - testB;
     EXPECT_DOUBLE_EQ(out[0], -1.0);
@@ -162,7 +162,6 @@ TEST(LinearAlgebraTests, VectorTestCopy)
     DVec testB;
 
     testB = testA;
-    std::cout << testB << std::endl;
 
     EXPECT_DOUBLE_EQ(testA[0], testB[0]);
     EXPECT_DOUBLE_EQ(testA[1], testB[1]);
@@ -219,9 +218,6 @@ TEST(LinearAlgebraTests, SolveCGTest)
     SparseMatrix A(vals, col_inds, row_ptrs);
 
     int numIters = SolveCG(A, b, x);
-
-    std::cout << "CGSolve result: " << x << std::endl;
-    std::cout << "The CGSolve took " << numIters << " iterations." << std::endl;
 
     EXPECT_NEAR(x[0], 1.0, 1.0e-5);
     EXPECT_NEAR(x[1], 1.0, 1.0e-5);
@@ -299,8 +295,6 @@ TEST(LinearAlgebraTests, SolveCGTestN50)
     //    For N=50 Laplacian, that is usually around 25-30 iterations.
     int iters = SolveCG(A, b, x);
 
-    std::cout << "Stress Test (N=" << N << ") Iterations: " << iters << std::endl;
-
     // 5. Verification
     //    Ensure it actually worked hard
     EXPECT_GT(iters, 10);
@@ -328,6 +322,11 @@ TEST(LinearAlgebraTests, SparseMatrixConstructFromTriplets)
             triplets[val_idx].value = vals[val_idx];
         }
     }
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    std::shuffle(triplets.begin(), triplets.end(), g);
 
     DSparseMatrix mtx(4);
     mtx.setFromTriplets(triplets);
