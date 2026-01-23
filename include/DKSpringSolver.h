@@ -34,7 +34,7 @@ public:
 		vIters = 20;
 		integrator = SolverType::IMPLICIT;
 		totalE = 0.0f;
-		n = 0;
+		num_verts = 0;
 	}
 	~DKSpringSolver() = default;
 	void accumulateForces();
@@ -43,7 +43,6 @@ public:
 	void step();
 	void sparseSetup();
 	void reset();
-	void symplecticSolver();
 	void implicitSolver();
 	bool setup(const std::shared_ptr<Mesh> m);
 	void detectCollisions();
@@ -77,13 +76,10 @@ private:
 	FVec lastVel;
 	FVec F;
 	FVec dv;
-	SparseMatrix M;
-	Eigen::MatrixXf M_inv;
-	Eigen::MatrixXf dFdX;
-	Eigen::MatrixXf dFdV;
-	Eigen::SparseMatrix<float> LHS;
-	Eigen::SparseLU< Eigen::SparseMatrix<float> > lu;
-	Eigen::BiCGSTAB<Eigen::SparseMatrix<float>, Eigen::IncompleteLUT<float>> bicg;
-	bool analyzed = false;
-	uint16_t n;
+	FSparseMatrix M;
+	FSparseMatrix M_inv;
+	FSparseMatrix dFdX;
+	FSparseMatrix dFdV;
+	FSparseMatrix LHS;
+	uint16_t num_verts;
 };

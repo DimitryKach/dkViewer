@@ -33,7 +33,7 @@ public:
 		vIters = 20;
 		integrator = SolverType::IMPLICIT;
 		totalE = 0.0f;
-		n = 0;
+		num_verts = 0;
 	}
 	~EigenSpringSolver() = default;
 	void accumulateForces();
@@ -84,5 +84,5 @@ private:
 	Eigen::SparseLU< Eigen::SparseMatrix<float> > lu;
 	Eigen::BiCGSTAB<Eigen::SparseMatrix<float>, Eigen::IncompleteLUT<float>> bicg;
 	bool analyzed = false;
-	uint16_t n;
+	uint16_t num_verts;
 };

@@ -391,3 +391,35 @@ TEST(LinearAlgebraTests, SparseMatrixFromTripletsZeroLastRow)
         EXPECT_EQ(row_ptrs[i], p_rowPtrs->at(i));
     }
 }
+
+TEST(LinearAlgebraTests, SparseMatrixIdentity)
+{
+    DSparseMatrix eye = DSparseMatrix::Identity(100);
+    auto values = eye.getValues();
+
+    for (int i = 0; i < 100; ++i)
+    {
+        EXPECT_DOUBLE_EQ(values->at(i), 1.0);
+    }
+}
+
+TEST(LinearAlgebraTests, SparseMatrixElementFuncs)
+{
+    DSparseMatrix eye = DSparseMatrix::Identity(100);
+
+    eye.setElement(10, 10, 2.0);
+    auto values = eye.getValues();
+    // Check if the value was set correctly
+    EXPECT_DOUBLE_EQ(values->at(10), 2.0);
+    // check if we can fetch the value with the () operator
+    EXPECT_DOUBLE_EQ(eye(10, 10), 2.0);
+    // Make sure we get a 0 if we parse a non-pattern element
+    EXPECT_DOUBLE_EQ(eye(10, 11), 0.0);
+    // Make sure we cannot set the non-pattern element
+    EXPECT_THROW(eye.setElement(10, 11, 2.0), std::runtime_error);
+    eye.setZero();
+    for (int i = 0; i < 100; ++i)
+    {
+        EXPECT_DOUBLE_EQ(values->at(i), 0.0);
+    }
+}

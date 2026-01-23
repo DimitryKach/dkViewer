@@ -1,6 +1,8 @@
+#pragma once
 #include <vector>
 #include <memory>
 #include <cassert>
+#include <numeric>
 #include <initializer_list>
 #include <iostream>
 #include <cmath>
@@ -33,6 +35,7 @@ public:
 		if (!matching) return matching;
 		for (int i = 0; i < m_data.size(); ++i)
 		{
+			// TODO: the tolerance is hardcoded. We should make a more flexible way of handling it.
 			matching = std::abs(m_data[i] - a.m_data[i]) < 1e-5; // This should work for floats and double
 			if (!matching) return matching;
 		}
@@ -142,6 +145,9 @@ public:
 		return this->dot(*this);
 	}
 
+	void setZero() {
+		std::memset(m_data.data(), T(0), m_data.size() * sizeof(T));
+	}
 };
 
 using DVec = Vec<double>;
@@ -171,12 +177,48 @@ class SparseMatrix {
 		out << "\n";
 		return out;
 	}
+private:
+	bool findElement(int row, int col, int& valIdx) const {
+		assert(row <= rows - 1 && row >= 0 && "The row is outside of the matrix dimensions");
+		assert(col <= cols - 1 && col >= 0 && "The column is outside of the matrix dimensions");
+		// Invalid index is -1 here.
+		valIdx = -1;
+		int row_p = row_ptrs[row];
+		if (row_ptrs[row + 1] - row_p == 0) {
+			return false;
+		}
+		auto it = std::lower_bound(col_indices.begin() + row_p, col_indices.begin() + row_ptrs[row + 1], col);
+		if (it != col_indices.begin() + row_ptrs[row + 1] && *it == col) {
+			valIdx = (it - col_indices.begin());
+			return true;
+		}
+		return false;
+	}
 public:
 	struct Triplet {
+		Triplet(T val, int r, int c) : value(val), row(r), col(c) {};
+		Triplet() : value(T(0)), row(-1), col(-1) {};
+		~Triplet() {};
 		T value;
 		int row;
 		int col;
 	};
+
+	static SparseMatrix<T> Identity(int num_rows)
+	{
+		SparseMatrix<T> out{};
+		out.rows = num_rows;
+		out.cols = num_rows;
+		out.values = std::vector<T>(num_rows, T(1.0));
+		out.col_indices = std::vector<int>(num_rows);
+		std::iota(out.col_indices.begin(), out.col_indices.end(), 0);
+		out.row_ptrs = std::vector<int>(num_rows+1);
+		std::iota(out.row_ptrs.begin(), out.row_ptrs.end(), 0);
+
+		return out;
+	}
+
+	SparseMatrix() : rows(0), cols(0) {};
 
 	// Creates a square matrix from the input values
 	SparseMatrix(std::vector<T>& vals, std::vector<int>& col_inds, std::vector<int>& row_ps)
@@ -251,16 +293,23 @@ public:
 	friend SparseMatrix<T> operator*(const SparseMatrix<T>& mtx, T scalar) {
 		return scalar * mtx;
 	}
-	int getRows() {
+
+	void operator*=(T scalar) {
+		for (int i = 0; i < values.size(); ++i)
+		{
+			values[i] *= scalar;
+		}
+	}
+	int getRows() const {
 		return rows;
 	}
-	const std::vector<T>* getValues() {
+	const std::vector<T>* getValues() const {
 		return &values;
 	}
-	const std::vector<int>* getColIndices() {
+	const std::vector<int>* getColIndices() const {
 		return &col_indices;
 	}
-	const std::vector<int>* getRowPtrs() {
+	const std::vector<int>* getRowPtrs() const {
 		return &row_ptrs;
 	}
 	void setFromTriplets(std::vector<Triplet>& triplets)
@@ -319,6 +368,26 @@ public:
 			result[r] = sum;
 		}
 	}
+
+	void setZero() {
+		std::memset(values.data(), T(0), values.size() * sizeof(T));
+	}
+
+	T operator()(int row, int col) const {
+		int valIdx = -1;
+		bool found = findElement(row, col, valIdx);
+		if (!found) return T(0);
+		return values[valIdx];
+	}
+
+	void setElement(int row, int col, T value) {
+		int valIdx = -1;
+		bool found = findElement(row, col, valIdx);
+		if (!found){
+			throw std::runtime_error("The element being set is not in the SparseMatrix pattern");
+		}
+		values[valIdx] = value;
+	}
 };
 
 using DSparseMatrix = SparseMatrix<double>;
@@ -327,15 +396,13 @@ using FSparseMatrix = SparseMatrix<float>;
 template <typename T>
 int SolveCG(const SparseMatrix<T>& A, const Vec<T>& b, Vec<T>& x, int max_iter = 100, T tol = T(1e-6))
 {
-	Vec<T> r = b - A * x;
+	Vec<T>Ap, r, p;
+	
+	r = b - A * x;
 	T r0lensq = r.lensq();
-	Vec<T> p = r;
+	p = r;
 
 	int curr_iter = 0;
-
-	// Worker variables
-	Vec<T> Ap;
-
 
 	while (curr_iter < max_iter && r0lensq > tol * tol)
 	{

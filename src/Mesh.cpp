@@ -274,6 +274,13 @@ void Mesh::SetVertex(const Eigen::Vector3f& pos, uint16_t id)
     m_positions[id] = pos;
 }
 
+void Mesh::SetVertex(const FVec& pos, uint16_t id)
+{
+    m_positions[id][0] = pos[0];
+    m_positions[id][1] = pos[1];
+    m_positions[id][2] = pos[2];
+}
+
 bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 {
     if (!m_texMgr)
@@ -332,6 +339,12 @@ Eigen::Vector3f Mesh::GetVertex(uint16_t id, bool worldSpace)
     if (worldSpace)
         out = modelMtx.block<3,3>(0,0) * out + modelMtx.block<3, 1>(0, 3);
     return out;
+}
+
+void Mesh::GetVertex(uint16_t id, FVec& container, bool worldSpace)
+{
+    Eigen::Vector3f out = GetVertex(id, worldSpace);
+    container = FVec{ std::vector<float>{ out[0], out[1], out[2] } };
 }
 
 void Mesh::PopulateBuffers()

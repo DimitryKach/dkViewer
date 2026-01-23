@@ -4,7 +4,7 @@ void EigenSpringSolver::accumulateForces()
 {
 	totalE = 0.0f;
 	F.setZero();
-	Eigen::VectorXf G = Eigen::Vector3f(0.0f, -9.8 * (mass / n), 0.0f).replicate(n, 1);
+	Eigen::VectorXf G = Eigen::Vector3f(0.0f, -9.8 * (mass / num_verts), 0.0f).replicate(num_verts, 1);
 	for (auto& sp : springs)
 	{
 		Eigen::Vector3f x_i = currPos.segment<3>(sp.edge->a * 3);
@@ -111,7 +111,7 @@ void EigenSpringSolver::step()
 void EigenSpringSolver::sparseSetup()
 {
 	std::vector<Eigen::Triplet<float>> pat;
-	pat.reserve(9 * n + 18 * springs.size());
+	pat.reserve(9 * num_verts + 18 * springs.size());
 
 	// This creates 9 triplets, and puts them into the pat vector. Thus we vectorize the 3x3 matrix
 	// and unroll it row-wise.
@@ -120,21 +120,21 @@ void EigenSpringSolver::sparseSetup()
 			pat.emplace_back(r0 + r, c0 + c, 1.0f);
 	};
 
-	for (int i = 0; i < n; ++i) addFull3x3Pattern(3 * i, 3 * i); // Do this for each vertex, along the block diagonal
+	for (int i = 0; i < num_verts; ++i) addFull3x3Pattern(3 * i, 3 * i); // Do this for each vertex, along the block diagonal
 	for (auto& sp : springs) { // Do this for each spring, twice
 		addFull3x3Pattern(3 * sp.edge->a, 3 * sp.edge->b);
 		addFull3x3Pattern(3 * sp.edge->b, 3 * sp.edge->a);
 	}
 
-	LHS = Eigen::SparseMatrix<float>(3 * n, 3 * n);
+	LHS = Eigen::SparseMatrix<float>(3 * num_verts, 3 * num_verts);
 
 	LHS.setFromTriplets(pat.begin(), pat.end());
 	LHS.makeCompressed();
 	assert(LHS.isCompressed());
 
-	bicg.setTolerance(1e-4);
+	/*bicg.setTolerance(1e-4);
 	bicg.setMaxIterations(200);
-	bicg.preconditioner().setFillfactor(4);
+	bicg.preconditioner().setFillfactor(4);*/
 }
 
 void EigenSpringSolver::reset()
@@ -143,7 +143,7 @@ void EigenSpringSolver::reset()
 	lastPos = defaultPos;
 	currVel.setZero();
 	F.setZero();
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < num_verts; i++)
 	{
 		Eigen::Vector3f new_pos = currPos.segment<3>(i * 3);
 		_mesh->SetVertex(new_pos, i);
@@ -156,7 +156,7 @@ void EigenSpringSolver::symplecticSolver()
 	currVel += M_inv * (dt * (F - beta_g * currVel));
 	currPos = currPos + dt * currVel;
 
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < num_verts; i++)
 	{
 		Eigen::Vector3f new_pos = currPos.segment<3>(i * 3);
 		_mesh->SetVertex(new_pos, i);
@@ -171,7 +171,7 @@ void EigenSpringSolver::implicitSolver()
 	//       different accuracy that depends on the step size.
 	Eigen::Map<Eigen::VectorXf>(LHS.valuePtr(), LHS.nonZeros()).setZero(); // We need to zero out the matrix but NOT destroy the pattern!
 	// Set the mass to the main sparse matrix
-	for (int i = 0; i < n; ++i) {
+	for (int i = 0; i < num_verts; ++i) {
 		for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c)
 			LHS.coeffRef(i * 3 + r, i * 3 + c) += M(r, c);
 	}
@@ -191,7 +191,7 @@ void EigenSpringSolver::implicitSolver()
 	dv.segment<3>(275 * 3) = Eigen::Vector3f::Zero();
 	currVel += dv;
 	currPos += dt * currVel;
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < num_verts; i++)
 	{
 		Eigen::Vector3f new_pos = currPos.segment<3>(i * 3);
 		_mesh->SetVertex(new_pos, i);
@@ -204,15 +204,15 @@ bool EigenSpringSolver::setup(const std::shared_ptr<Mesh> mesh)
 {
 	_mesh = mesh;
 	springs.clear();
-	n = _mesh->GetNumVerts();
-	currPos = Eigen::VectorXf::Zero(3 * n);
-	defaultPos = Eigen::VectorXf::Zero(3 * n);
-	currVel = Eigen::VectorXf::Zero(3 * n);
-	F = Eigen::VectorXf::Zero(3 * n);
-	dv = Eigen::VectorXf::Zero(3 * n);
-	M = Eigen::MatrixXf::Identity(3 * n, 3 * n);
-	M_inv = M * 1.0f / (mass / n);
-	M *= (mass / n);
+	num_verts = _mesh->GetNumVerts();
+	currPos = Eigen::VectorXf::Zero(3 * num_verts);
+	defaultPos = Eigen::VectorXf::Zero(3 * num_verts);
+	currVel = Eigen::VectorXf::Zero(3 * num_verts);
+	F = Eigen::VectorXf::Zero(3 * num_verts);
+	dv = Eigen::VectorXf::Zero(3 * num_verts);
+	M = Eigen::MatrixXf::Identity(3 * num_verts, 3 * num_verts);
+	M_inv = M * 1.0f / (mass / num_verts);
+	M *= (mass / num_verts);
 	// Create a spring for each edge
 	for (auto& edge : _mesh->m_edges)
 	{

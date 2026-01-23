@@ -12,6 +12,7 @@
 #include "TextureManager.h"
 #include "Shader.h"
 #include "AABB.h"
+#include "LinAlgLib.h"
 
 class Mesh
 {
@@ -53,8 +54,10 @@ public:
 	void InitAllMeshes(const aiScene* pScene);
 	void InitSingleMesh(const aiMesh* paiMesh);
 	void SetVertex(const Eigen::Vector3f& pos, uint16_t id);
+	void SetVertex(const FVec& pos, uint16_t id);
 	bool InitMaterials(const aiScene* pScene, const std::string& Filename);
 	Eigen::Vector3f GetVertex(uint16_t id, bool worldSpace=false);
+	void GetVertex(uint16_t id, FVec& container, bool worldSpace = false);
 	std::shared_ptr<Shader> m_shader;
 	void Cleanup();
 	void PopulateBuffers();
