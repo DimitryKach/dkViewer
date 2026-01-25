@@ -4,13 +4,10 @@ void DKSpringSolver::step()
 {
 	if (!doSim) return;
 	implicitSolver();
-	//std::cout << "Finished solve..." << std::endl;
 	if (doCollisions)
 	{
-		//std::cout << "Starting collisions..." << std::endl;
 		detectCollisions();
 	}
-	//std::cout << "Step..." << std::endl;
 }
 
 void DKSpringSolver::sparseSetup()
@@ -25,8 +22,10 @@ void DKSpringSolver::sparseSetup()
 			pat.emplace_back(1.0f, r0 + r, c0 + c);
 	};
 
-	for (int i = 0; i < num_verts; ++i) addFull3x3Pattern(3 * i, 3 * i); // Do this for each vertex, along the block diagonal
-	for (auto& sp : springs) { // Do this for each spring, twice
+	// Do this for each vertex, along the block diagonal
+	for (int i = 0; i < num_verts; ++i) addFull3x3Pattern(3 * i, 3 * i);
+	// Do this for each spring, twice
+	for (auto& sp : springs) {
 		addFull3x3Pattern(3 * sp.edge->a, 3 * sp.edge->b);
 		addFull3x3Pattern(3 * sp.edge->b, 3 * sp.edge->a);
 	}
@@ -34,6 +33,50 @@ void DKSpringSolver::sparseSetup()
 	LHS = FSparseMatrix(3 * num_verts, 3 * num_verts);
 
 	LHS.setFromTriplets(pat);
+}
+
+void DKSpringSolver::accumulatedFdX()
+{
+	//for (auto& sp : springs)
+	//{
+	//	FVec x_i, x_j, v_i, v_j;
+	//	for (int i = 0; i < 3; ++i)
+	//	{
+	//		x_i[i] = currPos[sp.edge->a * 3 + i];
+	//		x_j[i] = currPos[sp.edge->b * 3 + i];
+	//		v_i[i] = currVel[sp.edge->a * 3 + i];
+	//		v_j[i] = currVel[sp.edge->b * 3 + i];
+	//	}
+	//	FVec n = (x_j - x_i);
+	//	float l = n.length();
+	//	n *= (1.0f/l);
+	//	// TODO: we need a dense matrix here to make this work...
+	//	FMatrix nnt = n.outer(n);
+	//	// spring force
+	//	// The positional derivatives of the spring force, and the spring dampening
+	//	FMatrix K_s{ nnt.rows(), nnt.cols() };
+	//	FMatrix K_d{ nnt.rows(), nnt.cols() };
+	//	K_s.setZero();
+	//	K_d.setZero();
+	//	FMatrix eye = FMatrix::Identity(nnt.rows());
+	//	K_s = -k * (nnt + (l - sp.l0) / l * (eye - nnt));
+	//	FVec b = v_i - v_j;
+	//	K_d = -beta_s / l * ((n.dot(b) * eye + n.outer(b))) * (eye - nnt);
+	//	for (int r = 0; r < 3; ++r) {
+	//		for (int c = 0; c < 3; ++c) {
+	//			float k_s = K_s(r, c);
+	//			float k_d = K_d(r, c);
+	//			LHS.coeffRef(sp.edge->a * 3 + r, sp.edge->a * 3 + c) += -(dt * dt * k_s) - (dt * dt * k_d);
+	//			LHS.coeffRef(sp.edge->b * 3 + r, sp.edge->b * 3 + c) += -(dt * dt * k_s) - (dt * dt * k_d);
+	//			LHS.coeffRef(sp.edge->a * 3 + r, sp.edge->b * 3 + c) += (dt * dt * k_s) + (dt * dt * k_d);
+	//			LHS.coeffRef(sp.edge->b * 3 + r, sp.edge->a * 3 + c) += (dt * dt * k_s) + (dt * dt * k_d);
+	//		}
+	//	}
+	//}
+}
+
+void DKSpringSolver::accumulatedFdV()
+{
 }
 
 void DKSpringSolver::reset()
@@ -49,6 +92,51 @@ void DKSpringSolver::reset()
 		new_pos[1] = currPos[i * 3 + 1];
 		new_pos[2] = currPos[i * 3 + 2];
 		_mesh->SetVertex(new_pos, i);
+	}
+}
+
+void DKSpringSolver::accumulateForces()
+{
+	totalE = 0.0f;
+	F.setZero();
+	FVec G(num_verts * 3);
+	for (int i = 0; i < num_verts; ++i)
+	{
+		G[i * 3 + 1] = -9.8f * (mass / num_verts);
+	}
+	for (auto& sp : springs)
+	{
+		FVec x_i(3);
+		FVec x_j(3);
+		FVec v_i(3);
+		FVec v_j(3);
+		for (int i = 0; i < 3; ++i)
+		{
+			x_i[i] = currPos[sp.edge->a * 3 + i];
+			x_j[i] = currPos[sp.edge->b * 3 + i];
+			v_i[i] = currVel[sp.edge->a * 3 + i];
+			v_j[i] = currVel[sp.edge->b * 3 + i];
+		}
+		FVec n = (x_j - x_i);
+		float l = n.length();
+		totalE += (l - sp.l0) * (l - sp.l0) * k / 2.0f;
+		n *= (1.0f / n.length());
+		// spring force
+		FVec _f = n * (l - sp.l0) * k;
+		// spring dampening
+		_f += -beta_s * (n.dot(v_i - v_j)) * n;
+		for (int i = 0; i < 3; ++i)
+		{
+			F[sp.edge->a * 3 + i] += _f[i];
+			F[sp.edge->b * 3 + i] += -_f[i];
+		}
+	}
+	F += G;
+	F *= globalScale;
+	for (int i = 0; i < 3; ++i)
+	{
+		F[263 * 3 + i] = 0.0f;
+		F[275 * 3 + i] = 0.0f;
 	}
 }
 
@@ -121,8 +209,6 @@ bool DKSpringSolver::setup(const std::shared_ptr<Mesh> mesh)
 			currPos[edge.a * 3 + i] = x_i[i];
 			currPos[edge.b * 3 + i] = x_j[i];
 		}
-		//currPos.segment<3>(edge.a * 3) = x_i;
-		//currPos.segment<3>(edge.b * 3) = x_j;
 	};
 	sparseSetup();
 	defaultPos = currPos;
@@ -170,4 +256,37 @@ void DKSpringSolver::detectCollisions()
 void DKSpringSolver::addCollider(const std::shared_ptr<Mesh> m)
 {
 	colliders.push_back(m);
+}
+
+int DKSpringSolver::getNumVerts() {
+	return num_verts;
+}
+
+const FSparseMatrix* DKSpringSolver::getLHSMtx() {
+	return &LHS;
+}
+
+const FSparseMatrix* DKSpringSolver::getMassMtx() {
+	return &M;
+}
+const FSparseMatrix* DKSpringSolver::getInvMassMtx() {
+	return &M_inv;
+}
+const FSparseMatrix* DKSpringSolver::getdFdXMtx() {
+	return &dFdX;
+}
+const FSparseMatrix* DKSpringSolver::getdFdVMtx() {
+	return &dFdV;
+}
+const FVec* DKSpringSolver::getDefaultPos() {
+	return &defaultPos;
+}
+const FVec* DKSpringSolver::getCurrPos() {
+	return &currPos;
+}
+const FVec* DKSpringSolver::getCurrVel() {
+	return &currVel;
+}
+const FVec* DKSpringSolver::getF() {
+	return &F;
 }

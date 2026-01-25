@@ -47,6 +47,16 @@ public:
 	bool setup(const std::shared_ptr<Mesh> m);
 	void detectCollisions();
 	void addCollider(const std::shared_ptr<Mesh> m);
+	int getNumVerts();
+	const FSparseMatrix* getLHSMtx();
+	const FSparseMatrix* getMassMtx();
+	const FSparseMatrix* getInvMassMtx();
+	const FSparseMatrix* getdFdXMtx();
+	const FSparseMatrix* getdFdVMtx();
+	const FVec* getDefaultPos();
+	const FVec* getCurrPos();
+	const FVec* getCurrVel();
+	const FVec* getF();
 	float k;
 	float dt;
 	float mass;

@@ -422,3 +422,87 @@ TEST(LinearAlgebraTests, SparseMatrixElementFuncs)
         EXPECT_DOUBLE_EQ(values->at(i), 0.0);
     }
 }
+
+TEST(LinearAlgebraTests, MatrixTranspose)
+{
+    // TODO: make this a generic test that makes random matrices
+    std::vector<double> data{ 0,1,0,2,3,1,0,1,1,4,3,2,1,0,1 };
+    DMatrix test(5, 3, data);
+    // Check that the values and storage match
+    for (int r = 0; r < 5; ++r)
+    {
+        for (int c = 0; c < 3; ++c)
+        {
+            EXPECT_DOUBLE_EQ(test(r, c), data[r * 3 + c]);
+        }
+    }
+    // Test transposing
+    DMatrix testT = test.transpose();
+    for (int r = 0; r < 5; ++r)
+    {
+        for (int c = 0; c < 3; ++c)
+        {
+            EXPECT_DOUBLE_EQ(testT(c, r), test(r, c));
+        }
+    }
+}
+
+TEST(LinearAlgebraTests, MatrixMul)
+{
+    // TODO: make this a generic test that makes random matrices
+    std::vector<double> data{ 1,2,3,4,5,6 };
+    DMatrix a(2, 3, data);
+    DMatrix b(3, 2, data);
+
+    DMatrix result = a * b;
+    // Check dimensions of result
+    EXPECT_EQ(result.rows(), 2);
+    EXPECT_EQ(result.cols(), 2);
+    // Check that the results are correct
+    EXPECT_DOUBLE_EQ(result(0, 0), 22);
+    EXPECT_DOUBLE_EQ(result(0, 1), 28);
+    EXPECT_DOUBLE_EQ(result(1, 0), 49);
+    EXPECT_DOUBLE_EQ(result(1, 1), 64);
+
+    result *= -1;
+    EXPECT_DOUBLE_EQ(result(0, 0), -22);
+    EXPECT_DOUBLE_EQ(result(0, 1), -28);
+    EXPECT_DOUBLE_EQ(result(1, 0), -49);
+    EXPECT_DOUBLE_EQ(result(1, 1), -64);
+
+    result = result * 2.0;
+    EXPECT_DOUBLE_EQ(result(0, 0), -44);
+    EXPECT_DOUBLE_EQ(result(0, 1), -56);
+    EXPECT_DOUBLE_EQ(result(1, 0), -98);
+    EXPECT_DOUBLE_EQ(result(1, 1), -128);
+}
+
+TEST(LinearAlgebraTests, MatrixCompare)
+{
+    std::vector<double> data{ 1,2,3,4 };
+    DMatrix a(2, 2, data);
+    DMatrix b(2, 2, data);
+
+    EXPECT_TRUE(a == b);
+
+    b *= 2.0;
+
+    EXPECT_FALSE(a == b);
+}
+
+TEST(LinearAlgebraTests, MatrixAddSub)
+{
+    // TODO: make this a generic test that makes random matrices
+    std::vector<double> data{ 1,2,3,4 };
+    DMatrix a(2, 2, data);
+    DMatrix b(2, 2, data);
+
+    b *= 2.0f;
+
+    DMatrix result = b - a;
+    // Check that the results are correct
+    EXPECT_DOUBLE_EQ(result(0, 0), 1);
+    EXPECT_DOUBLE_EQ(result(0, 1), 2);
+    EXPECT_DOUBLE_EQ(result(1, 0), 3);
+    EXPECT_DOUBLE_EQ(result(1, 1), 4);
+}

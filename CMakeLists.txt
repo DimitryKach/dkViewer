@@ -188,6 +188,20 @@ target_link_libraries(dkViewerCore PUBLIC
     Eigen3::Eigen
 )
 
+# Check which compiler is being used and apply the correct flag
+if(MSVC)
+    target_compile_options(dkViewerCore PUBLIC /arch:AVX2 /fp:fast)
+endif()
+
+# 1. Find the OpenMP package (Required)
+find_package(OpenMP REQUIRED)
+
+# 2. Link it to your library
+if(OpenMP_CXX_FOUND)
+    # This automatically adds the /openmp flag and links the libraries
+    target_link_libraries(dkViewerCore PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
 # ----------------------------------------------------------------------------
 # 11) User Interface Executable
 # ----------------------------------------------------------------------------

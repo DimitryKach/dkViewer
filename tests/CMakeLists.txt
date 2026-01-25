@@ -29,3 +29,28 @@ target_link_libraries(dkViewerTests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(dkViewerTests)
+
+# --- Test Executable 2: Springs ---
+add_executable(SpringTests test_spring.cpp)
+
+target_compile_definitions(SpringTests PRIVATE
+    ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
+)
+
+target_link_libraries(SpringTests PRIVATE
+    dkViewerCore
+    GTest::gtest_main
+)
+
+gtest_discover_tests(SpringTests)
+
+# --- Test Executable 3: Speed tests ---
+add_executable(SpeedTests test_speed.cpp)
+
+target_compile_definitions(SpeedTests PRIVATE
+    ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
+)
+
+target_link_libraries(SpeedTests PRIVATE
+    dkViewerCore
+)

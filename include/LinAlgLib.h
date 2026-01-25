@@ -7,6 +7,7 @@
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
+#include <algorithm>
 
 
 template <typename T>
@@ -146,7 +147,13 @@ public:
 	}
 
 	void setZero() {
-		std::memset(m_data.data(), T(0), m_data.size() * sizeof(T));
+		std::fill(m_data.begin(), m_data.end(), T(0));
+	}
+
+	Matrix<T> outer(const Vec& vec) {
+		assert(vec.m_data.size() == m_data.size());
+		Matrix<T> out(m_data.size(), m_data.size());
+		return out;
 	}
 };
 
@@ -155,32 +162,16 @@ using FVec = Vec<float>;
 
 template <typename T>
 class SparseMatrix {
-	int rows;
-	int cols;
+	int m_rows;
+	int m_cols;
 	// Compressed Sparse Row format
 	std::vector<T> values;
 	std::vector<int> col_indices;
 	std::vector<int> row_ptrs; // Size is rows + 1
-
-	// TODO: Implement Matrix-Vector Multiply
-
-	friend std::ostream & operator <<(std::ostream& out, const SparseMatrix& mtx)
-	{
-		out << "\nSparseMatrx " << mtx.rows << "x" << mtx.cols << "\n";
-		for (int r = 0; r < mtx.rows; ++r)
-		{
-			for (int col_start = mtx.row_ptrs[r]; col_start < mtx.row_ptrs[r + 1]; ++col_start)
-			{
-				out << "(" << r << "," << mtx.col_indices[col_start] << "): " << mtx.values[col_start] << "\n";
-			}
-		}
-		out << "\n";
-		return out;
-	}
 private:
 	bool findElement(int row, int col, int& valIdx) const {
-		assert(row <= rows - 1 && row >= 0 && "The row is outside of the matrix dimensions");
-		assert(col <= cols - 1 && col >= 0 && "The column is outside of the matrix dimensions");
+		assert(row <= m_rows - 1 && row >= 0 && "The row is outside of the matrix dimensions");
+		assert(col <= m_cols - 1 && col >= 0 && "The column is outside of the matrix dimensions");
 		// Invalid index is -1 here.
 		valIdx = -1;
 		int row_p = row_ptrs[row];
@@ -207,8 +198,8 @@ public:
 	static SparseMatrix<T> Identity(int num_rows)
 	{
 		SparseMatrix<T> out{};
-		out.rows = num_rows;
-		out.cols = num_rows;
+		out.m_rows = num_rows;
+		out.m_cols = num_rows;
 		out.values = std::vector<T>(num_rows, T(1.0));
 		out.col_indices = std::vector<int>(num_rows);
 		std::iota(out.col_indices.begin(), out.col_indices.end(), 0);
@@ -218,14 +209,14 @@ public:
 		return out;
 	}
 
-	SparseMatrix() : rows(0), cols(0) {};
+	SparseMatrix() : m_rows(0), m_cols(0) {};
 
 	// Creates a square matrix from the input values
 	SparseMatrix(std::vector<T>& vals, std::vector<int>& col_inds, std::vector<int>& row_ps)
 	{
 		assert(vals.size() == col_inds.size() && "The size of values passed must match the size of column IDs");
-		rows = row_ps.size() - 1;
-		cols = rows;
+		m_rows = row_ps.size() - 1;
+		m_cols = m_rows;
 		row_ptrs = row_ps;
 		values = vals;
 		col_indices = col_inds;
@@ -236,8 +227,8 @@ public:
 	{
 		assert(vals.size() == col_inds.size() && "The size of values passed must match the size of column IDs");
 		assert(n_rows == row_ps.size() - 1 && "The number of rows must be one less than the size of the row pointer vector");
-		rows = n_rows;
-		cols = n_cols;
+		m_rows = n_rows;
+		m_cols = n_cols;
 		row_ptrs = row_ps;
 		values = vals;
 		col_indices = col_inds;
@@ -246,8 +237,8 @@ public:
 	// Create an empty NxN SparseMatrix
 	SparseMatrix(int n_rows)
 	{
-		rows = n_rows;
-		cols = n_rows;
+		m_rows = n_rows;
+		m_cols = n_rows;
 		row_ptrs = std::vector<int>(n_rows + 1, 0);
 		values = std::vector<T>();
 		col_indices = std::vector<int>();
@@ -256,18 +247,33 @@ public:
 	// Create an empty NxM SparseMatrix
 	SparseMatrix(int n_rows, int n_cols)
 	{
-		rows = n_rows;
-		cols = n_cols;
+		m_rows = n_rows;
+		m_cols = n_cols;
 		row_ptrs = std::vector<int>(n_rows + 1, 0);
 		values = std::vector<T>();
 		col_indices = std::vector<int>();
 	}
 
 	~SparseMatrix() {};
+
+	friend std::ostream& operator <<(std::ostream& out, const SparseMatrix& mtx)
+	{
+		out << "\nSparseMatrix " << mtx.m_rows << "x" << mtx.m_cols << "\n";
+		for (int r = 0; r < mtx.m_rows; ++r)
+		{
+			for (int col_start = mtx.row_ptrs[r]; col_start < mtx.row_ptrs[r + 1]; ++col_start)
+			{
+				out << "(" << r << "," << mtx.col_indices[col_start] << "): " << mtx.values[col_start] << "\n";
+			}
+		}
+		out << "\n";
+		return out;
+	}
+
 	Vec<T> operator*(const Vec<T>& x) const {
-		assert(x.size() == static_cast<size_t>(cols) && "The input vector must have the same number of elements as there are columns");
-		Vec<T> result(rows);
-		for (int r = 0; r < rows; ++r)
+		assert(x.size() == static_cast<size_t>(m_cols) && "The input vector must have the same number of elements as there are columns");
+		Vec<T> result(m_rows);
+		for (int r = 0; r < m_rows; ++r)
 		{
 			// Suggested accumulator living on register mem
 			// TODO: Verify the performance gain here if possible
@@ -300,8 +306,11 @@ public:
 			values[i] *= scalar;
 		}
 	}
-	int getRows() const {
-		return rows;
+	int rows() const {
+		return m_rows;
+	}
+	int cols() const {
+		return m_cols;
 	}
 	const std::vector<T>* getValues() const {
 		return &values;
@@ -321,7 +330,7 @@ public:
 		});
 		std::vector<T> vals(triplets.size());
 		std::vector<int> columns(triplets.size());
-		std::vector<int> row_ps(rows + 1, 0);
+		std::vector<int> row_ps(m_rows + 1, 0);
 		row_ps[row_ps.size() - 1] = triplets.size();
 		int curr_row = 0;
 		for (int i=0; i < triplets.size(); ++i)
@@ -331,7 +340,7 @@ public:
 			// If we switched rows, I need to store in the row_ptrs
 			if (curr_row != triplets[i].row)
 			{
-				if (triplets[i].row > rows - 1)
+				if (triplets[i].row > m_rows - 1)
 				{
 					throw std::runtime_error("The provided data has rows outside the maximum specified");
 				}
@@ -355,10 +364,10 @@ public:
 	void mul(const Vec<T>& x, Vec<T>& result) const
 	{
 		assert(&x != &result && "In-place multiplication is not supported");
-		assert(x.size() == static_cast<size_t>(cols) && "The input vector must have the same number of elements as there are columns");
-		if (result.size() != rows) result.resize(rows);
+		assert(x.size() == static_cast<size_t>(m_cols) && "The input vector must have the same number of elements as there are columns");
+		if (result.size() != m_rows) result.resize(m_rows);
 
-		for (int r = 0; r < rows; ++r)
+		for (int r = 0; r < m_rows; ++r)
 		{
 			T sum = T(0);
 			for (int col_start = row_ptrs[r]; col_start < row_ptrs[r + 1]; ++col_start)
@@ -370,7 +379,7 @@ public:
 	}
 
 	void setZero() {
-		std::memset(values.data(), T(0), values.size() * sizeof(T));
+		std::fill(values.begin(), values.end(), T(0));
 	}
 
 	T operator()(int row, int col) const {
@@ -392,6 +401,194 @@ public:
 
 using DSparseMatrix = SparseMatrix<double>;
 using FSparseMatrix = SparseMatrix<float>;
+
+template <typename T>
+class Matrix {
+	int m_rows;
+	int m_cols;
+	// We are storing the data row-wise.
+	std::vector<T> m_data;
+
+public:
+	
+	Matrix(int r, int c, const std::vector<T>& data) : m_rows(r), m_cols(c), m_data(data)
+	{
+		assert(data.size() == r * c && "The input data must have dimensions rows*cols");
+	}
+	// initialize an empty NxM matrix
+	Matrix(int r, int c) : m_rows(r), m_cols(c), m_data(m_rows * m_cols)
+	{
+		assert(r >= 0 && c >= 0 && "Cannot have rows or columns of size 0");
+	}
+	// Create a square NxN identity matrix
+	static Matrix<T> Identity(int r)
+	{
+		Matrix<T> out(r, r);
+		for (int i = 0; i < r; ++i)
+		{
+			out.m_data[i * r + i] = T(1);
+		}
+		return out;
+	}
+
+	Matrix<T> transpose() const
+	{
+		Matrix<T> out(m_cols, m_rows);
+
+		for (int r = 0; r < m_rows; ++r)
+		{
+			for (int c = 0; c < m_cols; ++c)
+			{
+				out.m_data[c * m_rows + r] = m_data[r * m_cols + c];
+			}
+		}
+
+		return out;
+	}
+	const T& operator()(int r, int c) const
+	{
+		assert(r >= 0 && r < m_rows && "The input row number is outside of row range");
+		assert(c >= 0 && c < m_cols && "The input column number is outside of column range");
+		return m_data[r * m_cols + c];
+	}
+	T& operator()(int r, int c)
+	{
+		assert(r >= 0 && r < m_rows && "The input row number is outside of row range");
+		assert(c >= 0 && c < m_cols && "The input column number is outside of column range");
+		return m_data[r * m_cols + c];
+	}
+	friend std::ostream& operator <<(std::ostream& out, const Matrix& mtx)
+	{
+		out << "\nMatrix " << mtx.m_rows << "x" << mtx.m_cols << "\n";
+		out << "[";
+		for (int r = 0; r < mtx.m_rows; ++r)
+		{
+			if (r == 0) out << "[";
+			else out << " [";
+			for (int c = 0; c < mtx.m_cols; ++c)
+			{
+				if (c < mtx.m_cols - 1)
+				{
+					out << mtx.m_data[r * mtx.m_cols + c] << ", ";
+				}
+				else
+				{
+					out << mtx.m_data[r * mtx.m_cols + c];
+				}
+			}
+			out << "]";
+			if (r != mtx.m_rows - 1) out << "\n";
+		}
+		out << "]\n";
+		return out;
+	}
+
+	Matrix<T> operator*(const Matrix<T>& mtx) const
+	{
+		assert(mtx.m_rows == m_cols && "Dimensionality mismatch between matrices");
+		Matrix<T> out(m_rows, mtx.m_cols);
+		// We use the IKJ method
+		const T* __restrict A_data = m_data.data();
+		const T* __restrict B_data = mtx.m_data.data();
+		T* C_data = out.m_data.data();
+		// For each row in A
+		for (int i = 0; i < m_rows; ++i)
+		{
+			// Jump to the row of A
+			const T* __restrict A_row = A_data + i * m_cols;
+			// Jump to the C row
+			T* C_row = C_data + i * out.m_cols;
+			// Now we need a row of B that will change with each column of A
+			for (int k = 0; k < m_cols; ++k)
+			{
+				const T* __restrict B_row = B_data + k * mtx.m_cols;
+				T val = A_row[k];
+				if (val == T(0)) continue;
+				for (int j = 0; j < mtx.m_cols; ++j)
+				{
+					C_row[j] += B_row[j] * val;
+				}
+			}
+		}
+		return out;
+	}
+
+	friend Matrix<T> operator*(T scalar, const Matrix<T>& mtx)
+	{
+		Matrix<T> out{ mtx.rows(), mtx.cols()};
+
+		std::transform(mtx.m_data.begin(), mtx.m_data.end(), out.m_data.begin(),
+			[scalar](T val) {return val * scalar; });
+
+		return out;
+	}
+
+	friend Matrix<T> operator*(const Matrix<T>& mtx, T scalar)
+	{
+		return scalar * mtx;
+	}
+	
+	void operator*=(const T& scalar)
+	{
+		for (int i = 0; i < m_data.size(); ++i)
+		{
+			m_data[i] *= scalar;
+		}
+	}
+
+	Matrix<T> operator+(const Matrix<T>& mtx) const
+	{
+		assert(mtx.m_rows == m_rows && mtx.m_cols == m_cols && "Dimensionality mismatch between matrices");
+		Matrix<T> out{m_rows, m_cols};
+		for (int i = 0; i < out.m_data.size(); ++i)
+		{
+			out.m_data[i] = m_data[i] + mtx.m_data[i];
+		}
+		return out;
+	}
+
+	Matrix<T> operator-(const Matrix<T>& mtx) const
+	{
+		assert(mtx.m_rows == m_rows && mtx.m_cols == m_cols && "Dimensionality mismatch between matrices");
+		Matrix<T> out{ m_rows, m_cols };
+		for (int i = 0; i < out.m_data.size(); ++i)
+		{
+			out.m_data[i] = m_data[i] - mtx.m_data[i];
+		}
+		return out;
+	}
+
+	bool operator==(const Matrix<T>& mtx) const
+	{
+		if (mtx.rows() != m_rows || mtx.cols() != m_cols) return false;
+		for (int i = 0; i < m_data.size(); ++i)
+		{
+			if (m_data[i] != mtx.m_data[i]) return false;
+		}
+		return true;
+	}
+
+	void setZero()
+	{
+		std::fill(m_data.begin(), m_data.end(), T(0));
+	}
+	int rows() const {
+		return m_rows;
+	}
+	int cols() const {
+		return m_cols;
+	}
+	T* data() {
+		return m_data.data();
+	}
+	const T* data() const {
+		return m_data.data();
+	}
+
+};
+
+using FMatrix = Matrix<float>;
+using DMatrix = Matrix<double>;
 
 template <typename T>
 int SolveCG(const SparseMatrix<T>& A, const Vec<T>& b, Vec<T>& x, int max_iter = 100, T tol = T(1e-6))
