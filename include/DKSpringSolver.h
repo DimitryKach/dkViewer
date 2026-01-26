@@ -35,6 +35,7 @@ public:
 	void accumulateForces();
 	void accumulatedFdX();
 	void accumulatedFdV();
+	void accumulatedFdXdV();
 	void step();
 	void sparseSetup();
 	void reset();
@@ -94,4 +95,5 @@ private:
 	FSparseMatrix dFdV;
 	FSparseMatrix LHS;
 	uint16_t num_verts;
+	std::vector<int> indexCache;
 };

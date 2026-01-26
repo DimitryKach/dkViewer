@@ -174,6 +174,117 @@ public:
 using DVec = Vec<double>;
 using FVec = Vec<float>;
 
+template <typename T> class Matrix3;
+
+template <typename T>
+class Vec3 {
+	T m_data[3];
+public:
+	explicit Vec3() : m_data{ 0 } {};
+	explicit Vec3(T val) : m_data{ val,val,val} {};
+	explicit Vec3(T x, T y, T z) : m_data{x,y,z} {};
+
+	bool operator==(const Vec3<T>& vec) const {
+		for (int i = 0; i < 3; ++i)
+		{
+			if (std::abs(m_data[i] - vec.m_data[i]) > 1e-5)
+				return false;
+		}
+		return true;
+	}
+
+	Vec3<T> operator+(const Vec3<T>& vec) const {
+		Vec3<T> out{ m_data[0] + vec.m_data[0],
+					 m_data[1] + vec.m_data[1],
+					 m_data[2] + vec.m_data[2] };
+		return out;
+	}
+
+	void operator+=(const Vec3<T>& vec) {
+		m_data[0] += vec.m_data[0];
+		m_data[1] += vec.m_data[1];
+		m_data[2] += vec.m_data[2];
+	}
+
+	Vec3<T> operator-(const Vec3<T>& vec) const {
+		Vec3<T> out{ m_data[0] - vec.m_data[0],
+					 m_data[1] - vec.m_data[1],
+					 m_data[2] - vec.m_data[2] };
+		return out;
+	}
+
+	friend Vec3<T> operator*(T scalar, const Vec3<T>& vec) {
+		Vec3<T> out{ vec.m_data[0]*scalar, vec.m_data[1]*scalar, vec.m_data[2]*scalar};
+		return out;
+	}
+	
+	friend Vec3<T> operator*(const Vec3<T>& vec, T scalar) {
+		return scalar * vec;
+	}
+
+	void operator*=(T scalar) {
+		m_data[0] *= scalar;
+		m_data[1] *= scalar;
+		m_data[2] *= scalar;
+	}
+
+	void operator-=(const Vec3<T>& vec) {
+		m_data[0] -= vec.m_data[0];
+		m_data[1] -= vec.m_data[1];
+		m_data[2] -= vec.m_data[2];
+	}
+
+	// Note to self - we needed an & because we are returning an lvalue that is a reference instead of a copy.
+	T& operator[](size_t i) {
+		return m_data[i];
+	}
+	// need a const accessor when the Vec variable is declared const
+	const T& operator[](size_t i) const {
+		return m_data[i];
+	}
+
+	T dot(const Vec3<T>& vec) const {
+		T out = T(0);
+		out += m_data[0] * vec.m_data[0];
+		out += m_data[1] * vec.m_data[1];
+		out += m_data[2] * vec.m_data[2];
+		return out;
+	}
+
+	size_t size() const {
+		return 3;
+	}
+
+	friend std::ostream& operator <<(std::ostream& out, const Vec3<T>& vec)
+	{
+		out << "\n" << "[";
+		for (int i = 0; i < 3; ++i)
+		{
+			out << vec.m_data[i];
+			if (i != 2) out << ", ";
+		}
+		out << "]\n";
+		return out;
+	}
+
+	T length() const {
+		return std::sqrt(lensq());
+	}
+
+	T lensq() const {
+		return this->dot(*this);
+	}
+
+	void setZero() {
+		std::fill(m_data, m_data + 3, T(0));
+	}
+
+	Matrix3<T> outer(const Vec3<T>& vec) const;
+};
+
+using DVec3 = Vec3<double>;
+using FVec3 = Vec3<float>;
+
 template <typename T>
 class SparseMatrix {
 	int m_rows;
@@ -182,23 +293,6 @@ class SparseMatrix {
 	std::vector<T> values;
 	std::vector<int> col_indices;
 	std::vector<int> row_ptrs; // Size is rows + 1
-private:
-	bool findElement(int row, int col, int& valIdx) const {
-		assert(row <= m_rows - 1 && row >= 0 && "The row is outside of the matrix dimensions");
-		assert(col <= m_cols - 1 && col >= 0 && "The column is outside of the matrix dimensions");
-		// Invalid index is -1 here.
-		valIdx = -1;
-		int row_p = row_ptrs[row];
-		if (row_ptrs[row + 1] - row_p == 0) {
-			return false;
-		}
-		auto it = std::lower_bound(col_indices.begin() + row_p, col_indices.begin() + row_ptrs[row + 1], col);
-		if (it != col_indices.begin() + row_ptrs[row + 1] && *it == col) {
-			valIdx = (it - col_indices.begin());
-			return true;
-		}
-		return false;
-	}
 public:
 	struct Triplet {
 		Triplet(T val, int r, int c) : value(val), row(r), col(c) {};
@@ -396,6 +490,23 @@ public:
 		std::fill(values.begin(), values.end(), T(0));
 	}
 
+	bool findElement(int row, int col, int& valIdx) const {
+		assert(row <= m_rows - 1 && row >= 0 && "The row is outside of the matrix dimensions");
+		assert(col <= m_cols - 1 && col >= 0 && "The column is outside of the matrix dimensions");
+		// Invalid index is -1 here.
+		valIdx = -1;
+		int row_p = row_ptrs[row];
+		if (row_ptrs[row + 1] - row_p == 0) {
+			return false;
+		}
+		auto it = std::lower_bound(col_indices.begin() + row_p, col_indices.begin() + row_ptrs[row + 1], col);
+		if (it != col_indices.begin() + row_ptrs[row + 1] && *it == col) {
+			valIdx = (it - col_indices.begin());
+			return true;
+		}
+		return false;
+	}
+
 	T operator()(int row, int col) const {
 		int valIdx = -1;
 		bool found = findElement(row, col, valIdx);
@@ -410,6 +521,21 @@ public:
 			throw std::runtime_error("The element being set is not in the SparseMatrix pattern");
 		}
 		values[valIdx] = value;
+	}
+	void setByValueIndex(int idx, T value){
+		values[idx] = value;
+	}
+	T& getByValueIndex(int idx) {
+		return values[idx];
+	}
+	const T& getByValueIndex(int idx) const {
+		return values[idx];
+	}
+	T* data() {
+		return values.data();
+	}
+	const T* data() const {
+		return values.data();
 	}
 };
 
@@ -603,6 +729,208 @@ public:
 
 using FMatrix = Matrix<float>;
 using DMatrix = Matrix<double>;
+
+template <typename T>
+class Matrix3 {
+	T m_data[9];
+
+public:
+
+	Matrix3() : m_data{ 0 } {
+	}
+	// initialize with all elements as a value
+	Matrix3(T value)
+	{
+		std::fill(m_data, m_data + 9, value);
+	}
+	// Create a square NxN identity matrix
+	static Matrix3<T> Identity()
+	{
+		Matrix3<T> out{};
+		out.m_data[0] = T(1);
+		out.m_data[4] = T(1);
+		out.m_data[8] = T(1);
+		return out;
+	}
+
+	Matrix3<T> transpose() const
+	{
+		Matrix3<T> out{};
+
+		for (int r = 0; r < 3; ++r)
+		{
+			for (int c = 0; c < 3; ++c)
+			{
+				out.m_data[c * 3 + r] = m_data[r * 3 + c];
+			}
+		}
+
+		return out;
+	}
+	const T& operator()(int r, int c) const
+	{
+		assert(r >= 0 && r < 3 && "The input row number is outside of row range");
+		assert(c >= 0 && c < 3 && "The input column number is outside of column range");
+		return m_data[r * 3 + c];
+	}
+	T& operator()(int r, int c)
+	{
+		assert(r >= 0 && r < 3 && "The input row number is outside of row range");
+		assert(c >= 0 && c < 3 && "The input column number is outside of column range");
+		return m_data[r * 3 + c];
+	}
+	friend std::ostream& operator <<(std::ostream& out, const Matrix3& mtx)
+	{
+		out << "\nMatrix " << 3 << "x" << 3 << "\n";
+		out << "[";
+		for (int r = 0; r < 3; ++r)
+		{
+			if (r == 0) out << "[";
+			else out << " [";
+			for (int c = 0; c < 3; ++c)
+			{
+				if (c < 2)
+				{
+					out << mtx.m_data[r * 3 + c] << ", ";
+				}
+				else
+				{
+					out << mtx.m_data[r * 3 + c];
+				}
+			}
+			out << "]";
+			if (r != 3 - 1) out << "\n";
+		}
+		out << "]\n";
+		return out;
+	}
+
+	Matrix3<T> operator*(const Matrix3<T>& mtx) const
+	{
+		Matrix3<T> out{};
+		// Unroll the whole multiplication here just to speed the hell out of it
+		// Out Row 1
+		out.m_data[0] = m_data[0] * mtx.m_data[0] + m_data[1] * mtx.m_data[3] + m_data[2] * mtx.m_data[6];
+		out.m_data[1] = m_data[0] * mtx.m_data[1] + m_data[1] * mtx.m_data[4] + m_data[2] * mtx.m_data[7];
+		out.m_data[2] = m_data[0] * mtx.m_data[2] + m_data[1] * mtx.m_data[5] + m_data[2] * mtx.m_data[8];
+		// Out Row 2
+		out.m_data[3] = m_data[3] * mtx.m_data[0] + m_data[4] * mtx.m_data[3] + m_data[5] * mtx.m_data[6];
+		out.m_data[4] = m_data[3] * mtx.m_data[1] + m_data[4] * mtx.m_data[4] + m_data[5] * mtx.m_data[7];
+		out.m_data[5] = m_data[3] * mtx.m_data[2] + m_data[4] * mtx.m_data[5] + m_data[5] * mtx.m_data[8];
+		// Out Row 3
+		out.m_data[6] = m_data[6] * mtx.m_data[0] + m_data[7] * mtx.m_data[3] + m_data[8] * mtx.m_data[6];
+		out.m_data[7] = m_data[6] * mtx.m_data[1] + m_data[7] * mtx.m_data[4] + m_data[8] * mtx.m_data[7];
+		out.m_data[8] = m_data[6] * mtx.m_data[2] + m_data[7] * mtx.m_data[5] + m_data[8] * mtx.m_data[8];
+		return out;
+	}
+
+	friend Matrix3<T> operator*(T scalar, const Matrix3<T>& mtx)
+	{
+		Matrix3<T> out{};
+
+		for (int i = 0; i < 9; ++i)
+		{
+			out.m_data[i] = mtx.m_data[i] * scalar;
+		}
+
+		return out;
+	}
+
+	friend Matrix3<T> operator*(const Matrix3<T>& mtx, T scalar)
+	{
+		return scalar * mtx;
+	}
+
+	void operator*=(const T& scalar)
+	{
+		for (int i = 0; i < 9; ++i)
+		{
+			m_data[i] *= scalar;
+		}
+	}
+
+	Matrix3<T> operator+(const Matrix3<T>& mtx) const
+	{
+		Matrix3<T> out{};
+		for (int i = 0; i < 9; ++i)
+		{
+			out.m_data[i] = m_data[i] + mtx.m_data[i];
+		}
+		return out;
+	}
+
+	void operator+=(const Matrix3<T>& mtx)
+	{
+		for (int i = 0; i < 9; ++i)
+		{
+			m_data[i] += mtx.m_data[i];
+		}
+	}
+
+	Matrix3<T> operator-(const Matrix3<T>& mtx) const
+	{
+		Matrix3<T> out{};
+		for (int i = 0; i < 9; ++i)
+		{
+			out.m_data[i] = m_data[i] - mtx.m_data[i];
+		}
+		return out;
+	}
+
+	void operator-=(const Matrix3<T>& mtx)
+	{
+		for (int i = 0; i < 9; ++i)
+		{
+			m_data[i] -= mtx.m_data[i];
+		}
+	}
+
+	bool operator==(const Matrix3<T>& mtx) const
+	{
+		for (int i = 0; i < 9; ++i)
+		{
+			if (m_data[i] != mtx.m_data[i]) return false;
+		}
+		return true;
+	}
+	void setZero()
+	{
+		std::fill(m_data, m_data + 9, T(0));
+	}
+	int rows() const {
+		return 3;
+	}
+	int cols() const {
+		return 3;
+	}
+	T* data() {
+		return m_data;
+	}
+	const T* data() const {
+		return m_data;
+	}
+
+};
+
+using FMatrix3 = Matrix3<float>;
+using DMatrix3 = Matrix3<double>;
+
+template <typename T>
+// Need to define outer AFTER we have the Matrix<T>.data() defined
+Matrix3<T> Vec3<T>::outer(const Vec3<T>& vec) const {
+	Matrix3<T> out{};
+	T* __restrict out_data = out.data();
+	out_data[0] = m_data[0] * vec.m_data[0];
+	out_data[1] = m_data[0] * vec.m_data[1];
+	out_data[2] = m_data[0] * vec.m_data[2];
+	out_data[3] = m_data[1] * vec.m_data[0];
+	out_data[4] = m_data[1] * vec.m_data[1];
+	out_data[5] = m_data[1] * vec.m_data[2];
+	out_data[6] = m_data[2] * vec.m_data[0];
+	out_data[7] = m_data[2] * vec.m_data[1];
+	out_data[8] = m_data[2] * vec.m_data[2];
+	return out;
+}
 
 template <typename T>
 int SolveCG(const SparseMatrix<T>& A, const Vec<T>& b, Vec<T>& x, int max_iter = 100, T tol = T(1e-8))
