@@ -7,11 +7,6 @@
 #include "Eigen/SparseLU"
 #include "unsupported/Eigen/IterativeSolvers"
 
-struct SimState {
-	std::vector<float> positions;
-	std::vector<float> velocities;
-};
-
 class DKSpringSolver {
 public:
 	struct Spring
@@ -76,6 +71,13 @@ public:
 	uint16_t vIters;
 
 private:
+	static bool triIntersect(const Eigen::Vector3f& src,
+		const Eigen::Vector3f& vtxA,
+		const Eigen::Vector3f& vtxB,
+		const Eigen::Vector3f& vtxC,
+		const Eigen::Vector3f& tNorm,
+		Eigen::Vector3f& hitPoint,
+		float tolerance);
 	std::shared_ptr<Mesh> _mesh;
 	std::vector<std::shared_ptr<Mesh>> colliders;
 	std::vector<Spring> springs;

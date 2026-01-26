@@ -37,46 +37,83 @@ void DKSpringSolver::sparseSetup()
 
 void DKSpringSolver::accumulatedFdX()
 {
-	//for (auto& sp : springs)
-	//{
-	//	FVec x_i, x_j, v_i, v_j;
-	//	for (int i = 0; i < 3; ++i)
-	//	{
-	//		x_i[i] = currPos[sp.edge->a * 3 + i];
-	//		x_j[i] = currPos[sp.edge->b * 3 + i];
-	//		v_i[i] = currVel[sp.edge->a * 3 + i];
-	//		v_j[i] = currVel[sp.edge->b * 3 + i];
-	//	}
-	//	FVec n = (x_j - x_i);
-	//	float l = n.length();
-	//	n *= (1.0f/l);
-	//	// TODO: we need a dense matrix here to make this work...
-	//	FMatrix nnt = n.outer(n);
-	//	// spring force
-	//	// The positional derivatives of the spring force, and the spring dampening
-	//	FMatrix K_s{ nnt.rows(), nnt.cols() };
-	//	FMatrix K_d{ nnt.rows(), nnt.cols() };
-	//	K_s.setZero();
-	//	K_d.setZero();
-	//	FMatrix eye = FMatrix::Identity(nnt.rows());
-	//	K_s = -k * (nnt + (l - sp.l0) / l * (eye - nnt));
-	//	FVec b = v_i - v_j;
-	//	K_d = -beta_s / l * ((n.dot(b) * eye + n.outer(b))) * (eye - nnt);
-	//	for (int r = 0; r < 3; ++r) {
-	//		for (int c = 0; c < 3; ++c) {
-	//			float k_s = K_s(r, c);
-	//			float k_d = K_d(r, c);
-	//			LHS.coeffRef(sp.edge->a * 3 + r, sp.edge->a * 3 + c) += -(dt * dt * k_s) - (dt * dt * k_d);
-	//			LHS.coeffRef(sp.edge->b * 3 + r, sp.edge->b * 3 + c) += -(dt * dt * k_s) - (dt * dt * k_d);
-	//			LHS.coeffRef(sp.edge->a * 3 + r, sp.edge->b * 3 + c) += (dt * dt * k_s) + (dt * dt * k_d);
-	//			LHS.coeffRef(sp.edge->b * 3 + r, sp.edge->a * 3 + c) += (dt * dt * k_s) + (dt * dt * k_d);
-	//		}
-	//	}
-	//}
+	for (auto& sp : springs)
+	{
+		FVec x_i(3);
+		FVec x_j(3);
+		FVec v_i(3);
+		FVec v_j(3);
+		for (int i = 0; i < 3; ++i)
+		{
+			x_i[i] = currPos[sp.edge->a * 3 + i];
+			x_j[i] = currPos[sp.edge->b * 3 + i];
+			v_i[i] = currVel[sp.edge->a * 3 + i];
+			v_j[i] = currVel[sp.edge->b * 3 + i];
+		}
+		FVec n = (x_j - x_i);
+		float l = n.length();
+		n *= (1.0f/l);
+		// TODO: we need a dense matrix here to make this work...
+		FMatrix nnt = n.outer(n);
+		// spring force
+		// The positional derivatives of the spring force, and the spring dampening
+		FMatrix K_s{ nnt.rows(), nnt.cols() };
+		FMatrix K_d{ nnt.rows(), nnt.cols() };
+		K_s.setZero();
+		K_d.setZero();
+		FMatrix eye = FMatrix::Identity(nnt.rows());
+		K_s = -k * (nnt + (l - sp.l0) / l * (eye - nnt));
+		FVec b = v_i - v_j;
+		K_d = -beta_s / l * ((n.dot(b) * eye + n.outer(b))) * (eye - nnt);
+		for (int r = 0; r < 3; ++r) {
+			for (int c = 0; c < 3; ++c) {
+				float k_s = K_s(r, c);
+				float k_d = K_d(r, c);
+				int elem_a_row = sp.edge->a * 3 + r;
+				int elem_a_col = sp.edge->a * 3 + c;
+				int elem_b_row = sp.edge->b * 3 + r;
+				int elem_b_col = sp.edge->b * 3 + c;
+				float val_m = -(dt * dt * k_s) - (dt * dt * k_d);
+				float val_p = (dt * dt * k_s) + (dt * dt * k_d);
+				LHS.setElement(elem_a_row, elem_a_col, LHS(elem_a_row, elem_a_col) + val_m);
+				LHS.setElement(elem_b_row, elem_b_col, LHS(elem_b_row, elem_b_col) + val_m);
+				LHS.setElement(elem_a_row, elem_b_col, LHS(elem_a_row, elem_b_col) + val_p);
+				LHS.setElement(elem_b_row, elem_a_col, LHS(elem_b_row, elem_a_col) + val_p);
+			}
+		}
+	}
 }
 
 void DKSpringSolver::accumulatedFdV()
 {
+	for (auto& sp : springs)
+	{
+		FVec x_i(3);
+		FVec x_j(3);
+		for (int i = 0; i < 3; ++i)
+		{
+			x_i[i] = currPos[sp.edge->a * 3 + i];
+			x_j[i] = currPos[sp.edge->b * 3 + i];
+		}
+		FVec n = (x_j - x_i);
+		float l = n.length();
+		n *= (1.0f/l);
+		FMatrix B = -beta_s * n.outer(n);
+		for (int r = 0; r < 3; ++r) {
+			for (int c = 0; c < 3; ++c) {
+				int elem_a_row = sp.edge->a * 3 + r;
+				int elem_a_col = sp.edge->a * 3 + c;
+				int elem_b_row = sp.edge->b * 3 + r;
+				int elem_b_col = sp.edge->b * 3 + c;
+				float val_m = -(dt * B(r, c));
+				float val_p = (dt * B(r, c));
+				LHS.setElement(elem_a_row, elem_a_col, LHS(elem_a_row, elem_a_col) + val_m);
+				LHS.setElement(elem_b_row, elem_b_col, LHS(elem_b_row, elem_b_col) + val_m);
+				LHS.setElement(elem_a_row, elem_b_col, LHS(elem_a_row, elem_b_col) + val_p);
+				LHS.setElement(elem_b_row, elem_a_col, LHS(elem_b_row, elem_a_col) + val_p);
+			}
+		}
+	}
 }
 
 void DKSpringSolver::reset()
@@ -87,7 +124,7 @@ void DKSpringSolver::reset()
 	F.setZero();
 	for (int i = 0; i < num_verts; i++)
 	{
-		FVec new_pos{ 3 };
+		FVec new_pos(3);
 		new_pos[0] = currPos[i * 3 + 0];
 		new_pos[1] = currPos[i * 3 + 1];
 		new_pos[2] = currPos[i * 3 + 2];
@@ -175,11 +212,10 @@ void DKSpringSolver::implicitSolver()
 	for (int i = 0; i < num_verts; i++)
 	{
 		FVec new_pos(3);
-		for(int i=0; i<3; ++i) new_pos[i] = currPos[i * 3 + i];
+		for(int j=0; j<3; ++j) new_pos[j] = currPos[i * 3 + j];
 		_mesh->SetVertex(new_pos, i);
 	}
 }
-
 
 
 bool DKSpringSolver::setup(const std::shared_ptr<Mesh> mesh)
@@ -216,7 +252,7 @@ bool DKSpringSolver::setup(const std::shared_ptr<Mesh> mesh)
 	return true;
 }
 
-bool triIntersect(const Eigen::Vector3f& src,
+bool DKSpringSolver::triIntersect(const Eigen::Vector3f& src,
 	const Eigen::Vector3f& vtxA,
 	const Eigen::Vector3f& vtxB,
 	const Eigen::Vector3f& vtxC,

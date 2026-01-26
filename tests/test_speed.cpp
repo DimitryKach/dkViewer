@@ -2,6 +2,11 @@
 #include <chrono>
 #include <iostream>
 #include <algorithm>
+#include "DKSpringSolver.h"
+#include "EigenSpringSolver.h"
+#include "Mesh.h"
+#include <string>
+#include <filesystem>
 
 struct gen_rand {
 	double range;
@@ -69,10 +74,11 @@ FMatrix mulSlow(const FMatrix& A, const FMatrix& B)
 	return out;
 }
 
-int main() {
+void runMatrixMulTest()
+{
 	int A_rows = 512;
 	int A_cols = 1024;
-	
+
 	int B_rows = 1024;
 	int B_cols = 512;
 
@@ -125,6 +131,62 @@ int main() {
 
 	std::cout << "The result took: " << ms_double.count() << std::endl;
 	std::cout << C(0, 0) << std::endl;
+}
+
+void runSpringSpeedTest()
+{
+	int num_iters = 1000;
+	auto modelPath = std::filesystem::path(ASSETS_DIR) / "plane4.obj";
+	std::shared_ptr<Mesh> testMesh = std::make_shared<Mesh>();
+	testMesh->LoadFileTinyObj(modelPath.string().c_str(), false);
+	DKSpringSolver DKSpSolve{};
+	EigenSpringSolver EiSpSolve{};
+	DKSpSolve.setup(testMesh);
+	EiSpSolve.setup(testMesh);
+
+	// Warm up DK solver
+	DKSpSolve.doSim = true;
+	DKSpSolve.step();
+	std::cout << "Running the DKSpSolve..." << std::endl;
+	auto start = std::chrono::high_resolution_clock::now();
+
+	for (int i = 0; i < num_iters; ++i)
+	{
+		DKSpSolve.step();
+	}
+	auto end = std::chrono::high_resolution_clock::now();
+
+	std::chrono::duration<double, std::milli> ms_double = end - start;
+
+	std::cout << "The result took: " << ms_double.count() << std::endl;
+
+	// Reset the mesh and stop the sim
+	DKSpSolve.doSim = false;
+	DKSpSolve.reset();
+
+	// Warm up the Eigen solver
+	EiSpSolve.doSim = true;
+	EiSpSolve.step();
+	std::cout << "Running the EigenSpSolve..." << std::endl;
+	start = std::chrono::high_resolution_clock::now();
+
+	for (int i = 0; i < num_iters; ++i)
+	{
+		EiSpSolve.step();
+	}
+	end = std::chrono::high_resolution_clock::now();
+
+	ms_double = end - start;
+
+	std::cout << "The result took: " << ms_double.count() << std::endl;
+
+	// Reset the mesh and stop the sim
+	EiSpSolve.doSim = false;
+	EiSpSolve.reset();
+}
+
+int main() {
+	runSpringSpeedTest();
 
 	return 0;
 }

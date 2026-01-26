@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <algorithm>
 
+template <typename T> class Matrix;
 
 template <typename T>
 class Vec {
@@ -150,9 +151,22 @@ public:
 		std::fill(m_data.begin(), m_data.end(), T(0));
 	}
 
-	Matrix<T> outer(const Vec& vec) {
+	Matrix<T> outer(const Vec& vec) const {
 		assert(vec.m_data.size() == m_data.size());
-		Matrix<T> out(m_data.size(), m_data.size());
+		int n_rows = m_data.size();
+		Matrix<T> out(n_rows, n_rows);
+		T* __restrict mtx_data = out.data();
+		const T* __restrict A_data = m_data.data();
+		const T* __restrict B_data = vec.m_data.data();
+		for (int r = 0; r < n_rows; ++r)
+		{
+			const T A_val = A_data[r];
+			T* __restrict row_data = mtx_data + r * n_rows;
+			for (int c = 0; c < n_rows; ++c)
+			{
+				row_data[c] = A_val * B_data[c];
+			}
+		}
 		return out;
 	}
 };
@@ -490,14 +504,14 @@ public:
 		// We use the IKJ method
 		const T* __restrict A_data = m_data.data();
 		const T* __restrict B_data = mtx.m_data.data();
-		T* C_data = out.m_data.data();
+		T* __restrict C_data = out.m_data.data();
 		// For each row in A
 		for (int i = 0; i < m_rows; ++i)
 		{
 			// Jump to the row of A
 			const T* __restrict A_row = A_data + i * m_cols;
 			// Jump to the C row
-			T* C_row = C_data + i * out.m_cols;
+			T* __restrict C_row = C_data + i * out.m_cols;
 			// Now we need a row of B that will change with each column of A
 			for (int k = 0; k < m_cols; ++k)
 			{
@@ -591,7 +605,7 @@ using FMatrix = Matrix<float>;
 using DMatrix = Matrix<double>;
 
 template <typename T>
-int SolveCG(const SparseMatrix<T>& A, const Vec<T>& b, Vec<T>& x, int max_iter = 100, T tol = T(1e-6))
+int SolveCG(const SparseMatrix<T>& A, const Vec<T>& b, Vec<T>& x, int max_iter = 100, T tol = T(1e-8))
 {
 	Vec<T>Ap, r, p;
 	

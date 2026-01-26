@@ -18,10 +18,10 @@ TEST( BaseTests, SpringSetup )
 	int num_verts = SpSolve.getNumVerts();
 	EXPECT_EQ(num_verts, testMesh->GetNumVerts());
 	// Check that the dimensions of M and LHS are appropriate
-	EXPECT_EQ(M->getRows(), num_verts * 3);
-	EXPECT_EQ(M->getCols(), num_verts * 3);
-	EXPECT_EQ(LHS->getRows(), num_verts * 3);
-	EXPECT_EQ(LHS->getCols(), num_verts * 3);
+	EXPECT_EQ(M->rows(), num_verts * 3);
+	EXPECT_EQ(M->cols(), num_verts * 3);
+	EXPECT_EQ(LHS->rows(), num_verts * 3);
+	EXPECT_EQ(LHS->cols(), num_verts * 3);
 	// Check the mass
 	float mass = 1.0f / testMesh->GetNumVerts();
 	float inv_mass = testMesh->GetNumVerts();

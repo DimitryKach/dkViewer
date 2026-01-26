@@ -230,7 +230,7 @@ bool EigenSpringSolver::setup(const std::shared_ptr<Mesh> mesh)
 	return true;
 }
 
-bool triIntersect(const Eigen::Vector3f& src,
+bool EigenSpringSolver::triIntersect(const Eigen::Vector3f& src,
 	const Eigen::Vector3f& vtxA,
 	const Eigen::Vector3f& vtxB,
 	const Eigen::Vector3f& vtxC,

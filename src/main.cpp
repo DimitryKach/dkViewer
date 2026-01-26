@@ -24,7 +24,8 @@
 #include "Scene.h"
 #include "Camera.h"
 #include "Mesh.h"
-#include "EigenSpringSolver.h"
+//#include "EigenSpringSolver.h"
+#include "DKSpringSolver.h"
 
 static const std::string g_assets_folder = ASSETS_DIR;
 static bool g_ShowStatsOverlay = false;
@@ -38,7 +39,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 Scene* MyScene = NULL;
-EigenSpringSolver* SpSolve = NULL;
+//EigenSpringSolver* SpSolve = NULL;
+DKSpringSolver* SpSolve = NULL;
 
 void setupScene(Scene* scene)
 {
@@ -113,7 +115,9 @@ int main()
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     
     MyScene = new Scene(); // This creates a default camera
-    SpSolve = new EigenSpringSolver();
+    //SpSolve = new EigenSpringSolver();
+    SpSolve = new DKSpringSolver();
+
 
     GLFWwindow* window = glfwCreateWindow(MyScene->SCR_WIDTH, MyScene->SCR_HEIGHT, MyScene->title, NULL, NULL);
     if (window == NULL)
