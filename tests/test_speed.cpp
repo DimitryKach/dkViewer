@@ -135,7 +135,9 @@ void runMatrixMulTest()
 
 void runSpringSpeedTest()
 {
+	std::cout << "Setting up the spring solver speed test" << std::endl;
 	int num_iters = 1000;
+	std::cout << "Number of iterations being tested is: " << num_iters << std::endl;
 	auto modelPath = std::filesystem::path(ASSETS_DIR) / "plane4.obj";
 	std::shared_ptr<Mesh> testMesh = std::make_shared<Mesh>();
 	testMesh->LoadFileTinyObj(modelPath.string().c_str(), false);
@@ -143,6 +145,8 @@ void runSpringSpeedTest()
 	EigenSpringSolver EiSpSolve{};
 	DKSpSolve.setup(testMesh);
 	EiSpSolve.setup(testMesh);
+
+	std::cout << "Number of springs being simulated is: " << DKSpSolve.getNumSprings() << std::endl;
 
 	// Warm up DK solver
 	DKSpSolve.doSim = true;
@@ -159,6 +163,7 @@ void runSpringSpeedTest()
 	std::chrono::duration<double, std::milli> ms_double = end - start;
 
 	std::cout << "The result took: " << ms_double.count() << std::endl;
+	std::cout << "Average time per step is: " << ms_double.count() / (double)num_iters << "ms" << std::endl;
 
 	// Reset the mesh and stop the sim
 	DKSpSolve.doSim = false;
@@ -179,6 +184,7 @@ void runSpringSpeedTest()
 	ms_double = end - start;
 
 	std::cout << "The result took: " << ms_double.count() << std::endl;
+	std::cout << "Average time per step is: " << ms_double.count() / (double)num_iters << "ms" << std::endl;
 
 	// Reset the mesh and stop the sim
 	EiSpSolve.doSim = false;

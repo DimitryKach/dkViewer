@@ -33,8 +33,6 @@ public:
 	}
 	~DKSpringSolver() = default;
 	void accumulateForces();
-	void accumulatedFdX();
-	void accumulatedFdV();
 	void accumulatedFdXdV();
 	void step();
 	void sparseSetup();
@@ -44,6 +42,7 @@ public:
 	void detectCollisions();
 	void addCollider(const std::shared_ptr<Mesh> m);
 	int getNumVerts();
+	int getNumSprings();
 	const FSparseMatrix* getLHSMtx();
 	const FSparseMatrix* getMassMtx();
 	const FSparseMatrix* getInvMassMtx();
@@ -95,5 +94,6 @@ private:
 	FSparseMatrix dFdV;
 	FSparseMatrix LHS;
 	uint16_t num_verts;
-	std::vector<int> indexCache;
+	std::vector<int> indexCacheSpring;
+	std::vector<int> indexCacheDiagonal;
 };

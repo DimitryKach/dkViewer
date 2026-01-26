@@ -506,3 +506,136 @@ TEST(LinearAlgebraTests, MatrixAddSub)
     EXPECT_DOUBLE_EQ(result(1, 0), 3);
     EXPECT_DOUBLE_EQ(result(1, 1), 4);
 }
+
+TEST(LinearAlgebraTests, Vec3Tests)
+{
+    FVec3 a{ 1.0f,2.0f,3.0f };
+    FVec3 b = a;
+    EXPECT_FLOAT_EQ(a.dot(a), 14.0f);
+    a *= 2.0f;
+    EXPECT_FLOAT_EQ(a[0], 2.0f);
+    EXPECT_FLOAT_EQ(a[1], 4.0f);
+    EXPECT_FLOAT_EQ(a[2], 6.0f);
+    b = b * 3.0f;
+    EXPECT_FLOAT_EQ(b[0], 3.0f);
+    EXPECT_FLOAT_EQ(b[1], 6.0f);
+    EXPECT_FLOAT_EQ(b[2], 9.0f);
+    const FVec3 c = a + b;
+    EXPECT_FLOAT_EQ(c[0], 5.0f);
+    EXPECT_FLOAT_EQ(c[1], 10.0f);
+    EXPECT_FLOAT_EQ(c[2], 15.0f);
+    FVec3 d = c - b;
+    EXPECT_TRUE(d == a);
+    d -= a;
+    EXPECT_FLOAT_EQ(d[0], 0.0f);
+    EXPECT_FLOAT_EQ(d[1], 0.0f);
+    EXPECT_FLOAT_EQ(d[2], 0.0f);
+    d += b;
+    EXPECT_FLOAT_EQ(d[0], 3.0f);
+    EXPECT_FLOAT_EQ(d[1], 6.0f);
+    EXPECT_FLOAT_EQ(d[2], 9.0f);
+    d = 0.5f * d;
+    EXPECT_FLOAT_EQ(d[0], 1.5f);
+    EXPECT_FLOAT_EQ(d[1], 3.0f);
+    EXPECT_FLOAT_EQ(d[2], 4.5f);
+    FVec3 e = a;
+    e[2] = 4.0f;
+    float e_lensq = e.lensq();
+    float e_len = e.length();
+    EXPECT_FLOAT_EQ(e_len, 6.0f);
+    e.setZero();
+    EXPECT_FLOAT_EQ(e[0], 0.0f);
+    EXPECT_FLOAT_EQ(e[1], 0.0f);
+    EXPECT_FLOAT_EQ(e[2], 0.0f);
+}
+
+TEST(LinearAlgebraTests, Matrix3Tests)
+{
+    FMatrix3 A{};
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            EXPECT_FLOAT_EQ(A(i, j), 0.0f);
+        }
+    }
+    FMatrix3 EYE = FMatrix3::Identity();
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            if (i == j) EXPECT_FLOAT_EQ(EYE(i, j), 1.0f);
+            else EXPECT_FLOAT_EQ(EYE(i, j), 0.0f);
+        }
+    }
+    FMatrix3 B{ 2.0f };
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            EXPECT_FLOAT_EQ(B(i, j), 2.0f);
+        }
+    }
+    FMatrix3 C = B - EYE;
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            if (i == j) EXPECT_FLOAT_EQ(C(i, j), 1.0f);
+            else EXPECT_FLOAT_EQ(C(i, j), 2.0f);
+        }
+    }
+    C(0, 0) = 3.0f;
+    C(0, 2) = 4.0f;
+    C(1, 0) = 5.0f;
+    FMatrix3 Ct = C.transpose();
+    EXPECT_FLOAT_EQ(Ct(0, 0), 3.0f);
+    EXPECT_FLOAT_EQ(Ct(0, 1), 5.0f);
+    EXPECT_FLOAT_EQ(Ct(0, 2), 2.0f);
+    EXPECT_FLOAT_EQ(Ct(1, 0), 2.0f);
+    EXPECT_FLOAT_EQ(Ct(1, 1), 1.0f);
+    EXPECT_FLOAT_EQ(Ct(1, 2), 2.0f);
+    EXPECT_FLOAT_EQ(Ct(2, 0), 4.0f);
+    EXPECT_FLOAT_EQ(Ct(2, 1), 2.0f);
+    EXPECT_FLOAT_EQ(Ct(2, 2), 1.0f);
+
+    FMatrix3 D = C * Ct;
+    EXPECT_FLOAT_EQ(D(0, 0), 29.0f);
+    EXPECT_FLOAT_EQ(D(0, 1), 25.0f);
+    EXPECT_FLOAT_EQ(D(0, 2), 14.0f);
+    EXPECT_FLOAT_EQ(D(1, 0), 25.0f);
+    EXPECT_FLOAT_EQ(D(1, 1), 30.0f);
+    EXPECT_FLOAT_EQ(D(1, 2), 14.0f);
+    EXPECT_FLOAT_EQ(D(2, 0), 14.0f);
+    EXPECT_FLOAT_EQ(D(2, 1), 14.0f);
+    EXPECT_FLOAT_EQ(D(2, 2), 9.0f);
+
+    FMatrix3 E = EYE * 2.0f;
+    EXPECT_FLOAT_EQ(E(0, 0), 2.0f);
+    EXPECT_FLOAT_EQ(E(1, 1), 2.0f);
+    EXPECT_FLOAT_EQ(E(2, 2), 2.0f);
+    FMatrix3 F = 2.0f * EYE;
+    EXPECT_TRUE(E == F);
+    EXPECT_FALSE(E == D);
+    D.setZero();
+    float* D_data = D.data();
+    for (int i = 0; i < 9; ++i)
+    {
+        EXPECT_FLOAT_EQ(D_data[i], 0.0f);
+    }
+}
+
+TEST(LinearAlgebraTests, Vec3OuterTest)
+{
+    FVec3 vec{ 1.0f, 2.0f, 3.0f };
+    FMatrix3 mtx = vec.outer(vec);
+    EXPECT_FLOAT_EQ(mtx(0, 0), 1.0f);
+    EXPECT_FLOAT_EQ(mtx(0, 1), 2.0f);
+    EXPECT_FLOAT_EQ(mtx(0, 2), 3.0f);
+    EXPECT_FLOAT_EQ(mtx(1, 0), 2.0f);
+    EXPECT_FLOAT_EQ(mtx(1, 1), 4.0f);
+    EXPECT_FLOAT_EQ(mtx(1, 2), 6.0f);
+    EXPECT_FLOAT_EQ(mtx(2, 0), 3.0f);
+    EXPECT_FLOAT_EQ(mtx(2, 1), 6.0f);
+    EXPECT_FLOAT_EQ(mtx(2, 2), 9.0f);
+}

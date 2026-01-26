@@ -169,6 +169,12 @@ public:
 		}
 		return out;
 	}
+	T* data() {
+		return m_data.data();
+	}
+	const T* data() const {
+		return m_data.data();
+	}
 };
 
 using DVec = Vec<double>;
@@ -213,6 +219,12 @@ public:
 		return out;
 	}
 
+	void operator-=(const Vec3<T>& vec) {
+		m_data[0] -= vec.m_data[0];
+		m_data[1] -= vec.m_data[1];
+		m_data[2] -= vec.m_data[2];
+	}
+
 	friend Vec3<T> operator*(T scalar, const Vec3<T>& vec) {
 		Vec3<T> out{ vec.m_data[0]*scalar, vec.m_data[1]*scalar, vec.m_data[2]*scalar};
 		return out;
@@ -226,12 +238,6 @@ public:
 		m_data[0] *= scalar;
 		m_data[1] *= scalar;
 		m_data[2] *= scalar;
-	}
-
-	void operator-=(const Vec3<T>& vec) {
-		m_data[0] -= vec.m_data[0];
-		m_data[1] -= vec.m_data[1];
-		m_data[2] -= vec.m_data[2];
 	}
 
 	// Note to self - we needed an & because we are returning an lvalue that is a reference instead of a copy.
