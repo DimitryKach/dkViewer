@@ -281,6 +281,13 @@ void Mesh::SetVertex(const FVec& pos, uint16_t id)
     m_positions[id][2] = pos[2];
 }
 
+void Mesh::SetVertex(const FVec3& pos, uint16_t id)
+{
+    m_positions[id][0] = pos[0];
+    m_positions[id][1] = pos[1];
+    m_positions[id][2] = pos[2];
+}
+
 bool Mesh::InitMaterials(const aiScene* pScene, const std::string& Filename)
 {
     if (!m_texMgr)
@@ -345,6 +352,12 @@ void Mesh::GetVertex(uint16_t id, FVec& container, bool worldSpace)
 {
     Eigen::Vector3f out = GetVertex(id, worldSpace);
     container = FVec{ std::vector<float>{ out[0], out[1], out[2] } };
+}
+
+void Mesh::GetVertex(uint16_t id, FVec3& container, bool worldSpace)
+{
+    Eigen::Vector3f out = GetVertex(id, worldSpace);
+    container = FVec3{ out[0], out[1], out[2] };
 }
 
 void Mesh::PopulateBuffers()

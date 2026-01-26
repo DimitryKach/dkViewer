@@ -316,7 +316,7 @@ void EigenSpringSolver::detectCollisions()
 
 	}
 	// Resolve Collisions
-	for (auto col : collisions)
+	for (auto& col : collisions)
 	{
 		auto velVec = currVel.segment<3>(col.srcId * 3);
 		if (col.colNorm.dot(velVec) < 0.0f)

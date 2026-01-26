@@ -274,18 +274,18 @@ bool DKSpringSolver::setup(const std::shared_ptr<Mesh> mesh)
 	return true;
 }
 
-bool DKSpringSolver::triIntersect(const Eigen::Vector3f& src,
-	const Eigen::Vector3f& vtxA,
-	const Eigen::Vector3f& vtxB,
-	const Eigen::Vector3f& vtxC,
-	const Eigen::Vector3f& tNorm,
-	Eigen::Vector3f& hitPoint,
+bool DKSpringSolver::triIntersect(const FVec3& src,
+	const FVec3& vtxA,
+	const FVec3& vtxB,
+	const FVec3& vtxC,
+	const FVec3& tNorm,
+	FVec3& hitPoint,
 	float tolerance)
 {
-	Eigen::Vector3f result(0, 0, 0);
+	FVec3 result(0, 0, 0);
 
 	// One of the verts plus the normal define the plane. Compute closest point on plane
-	Eigen::Vector3f pToVtx = vtxA - src;
+	FVec3 pToVtx = vtxA - src;
 	float distToPlane = tNorm.dot(pToVtx);
 
 	if (abs(distToPlane) > tolerance) return false;
@@ -295,9 +295,9 @@ bool DKSpringSolver::triIntersect(const Eigen::Vector3f& src,
 	// Determine if point is inside the triangle
 	bool inside = false;
 
-	Eigen::Vector3f alpha = (vtxB - vtxA).cross(result - vtxA);
-	Eigen::Vector3f beta = (vtxC - vtxB).cross(result - vtxB);
-	Eigen::Vector3f gamma = (vtxA - vtxC).cross(result - vtxC);
+	FVec3 alpha = (vtxB - vtxA).cross(result - vtxA);
+	FVec3 beta = (vtxC - vtxB).cross(result - vtxB);
+	FVec3 gamma = (vtxA - vtxC).cross(result - vtxC);
 
 	inside = (alpha.dot(tNorm) > 0 && beta.dot(tNorm) > 0 && gamma.dot(tNorm) > 0);
 
@@ -308,6 +308,97 @@ bool DKSpringSolver::triIntersect(const Eigen::Vector3f& src,
 
 void DKSpringSolver::detectCollisions()
 {
+	/*
+	For each collider
+	- get the mesh
+	- for each vertex
+		- for each triangle
+		- get closest point
+		- if close enough and penetrating
+			- push it back along the velocity direction to be on the triangle
+	*/
+	struct CollisionCombo
+	{
+		int srcId;
+		FVec3 colNorm;
+		FVec3 contactPoint;
+	};
+	struct CollisionComparator {
+		bool operator()(const CollisionCombo& a, const CollisionCombo& b) const {
+			return a.srcId < b.srcId;
+		}
+	};
+	std::set<CollisionCombo, CollisionComparator> collisions;
+	for (auto& collider : colliders)
+	{
+		// Brute force first
+		for (int vId = 0; vId < currPos.size() / 3; vId++)
+		{
+			FVec3 x_i{};
+			for (int i=0; i<3; ++i)
+			{ 
+				x_i[i] = currPos[vId * 3 + i];
+			}
+			for (int i = 0; i < collider->GetNumTriangles(); i++)
+			{
+				int* vIndices = collider->GetTriIndices(i);
+				FVec3 vA{};
+				FVec3 vB{};
+				FVec3 vC{};
+				collider->GetVertex(vIndices[0], vA, true);
+				collider->GetVertex(vIndices[1], vB, true);
+				collider->GetVertex(vIndices[2], vC, true);
+				if ((x_i - vA).lensq() > colTol && (x_i - vB).lensq() > colTol && (x_i - vC).lensq() > colTol)
+				{
+					continue;
+				}
+				FVec3 norm = (vB - vA).cross(vC - vA);
+				norm *= (1.0f/norm.length());
+
+				FVec3 hitPoint;
+				if (triIntersect(x_i, vA, vB, vC, norm, hitPoint, colTol))
+				{
+					CollisionCombo col = { vId, norm, hitPoint };
+					collisions.insert(col);
+					//std::cout << "Point " << vId << " hit the collider!" << std::endl;
+				}
+			}
+		}
+
+	}
+	// Resolve Collisions
+	FVec3 velVec{};
+	FVec3 val{};
+	FVec3 posVec{};
+	FVec3 pos{};
+	for (auto& col : collisions)
+	{
+		for (int i = 0; i < 3; ++i)
+		{
+			velVec[i] = currVel[col.srcId * 3 + i];
+		}
+		if (col.colNorm.dot(velVec) < 0.0f)
+		{
+			val = velVec - col.colNorm * (col.colNorm.dot(velVec));
+			for (int i = 0; i < 3; ++i)
+			{
+				currVel[col.srcId * 3 + i] = val[i];
+			}
+		}
+		for (int i = 0; i < 3; ++i)
+		{
+			posVec[i] = currPos[col.srcId * 3 + i] - col.colNorm[i];
+		}
+		if (col.colNorm.dot(posVec) < 0)
+		{
+			pos = col.contactPoint + col.colNorm * colTol;
+			for (int i = 0; i < 3; ++i)
+			{
+				currPos[col.srcId * 3 + i] = pos[i];
+			}
+			_mesh->SetVertex(pos, col.srcId);
+		}
+	}
 
 }
 

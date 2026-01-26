@@ -285,6 +285,14 @@ public:
 		std::fill(m_data, m_data + 3, T(0));
 	}
 
+	Vec3<T> cross(const Vec3<T>& vec) const {
+		Vec3<T> out{};
+		out.m_data[0] = m_data[1] * vec.m_data[2] - m_data[2] * vec.m_data[1];
+		out.m_data[1] = m_data[2] * vec.m_data[0] - m_data[0] * vec.m_data[2];
+		out.m_data[2] = m_data[0] * vec.m_data[1] - m_data[1] * vec.m_data[0];
+		return out;
+	}
+
 	Matrix3<T> outer(const Vec3<T>& vec) const;
 };
 

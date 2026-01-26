@@ -71,12 +71,12 @@ public:
 	uint16_t vIters;
 
 private:
-	static bool triIntersect(const Eigen::Vector3f& src,
-		const Eigen::Vector3f& vtxA,
-		const Eigen::Vector3f& vtxB,
-		const Eigen::Vector3f& vtxC,
-		const Eigen::Vector3f& tNorm,
-		Eigen::Vector3f& hitPoint,
+	static bool triIntersect(const FVec3& src,
+		const FVec3& vtxA,
+		const FVec3& vtxB,
+		const FVec3& vtxC,
+		const FVec3& tNorm,
+		FVec3& hitPoint,
 		float tolerance);
 	std::shared_ptr<Mesh> _mesh;
 	std::vector<std::shared_ptr<Mesh>> colliders;
